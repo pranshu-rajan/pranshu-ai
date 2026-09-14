@@ -68,7 +68,11 @@ export default function Home() {
             <div>
               <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">AI Provider</span>
               <p className="text-base font-bold font-mono text-white">
-                {status?.ollamaAvailable ? "Local Ollama" : "FastAPI Cloud"}
+                {status?.provider === "groq"
+                  ? "Groq Cloud (LLaMA 3.3)"
+                  : status?.ollamaAvailable
+                  ? "Local Ollama"
+                  : "FastAPI Engine"}
               </p>
             </div>
           </div>
@@ -87,7 +91,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-white/5 bg-[#08090d] py-6 text-center text-xs text-gray-500">
         <p>
-          VectorDB Pro & Advanced RAG • Designed & Engineered by{" "}
+          Pranshu&apos;s AI • Production Vector Database & Advanced RAG • Designed & Engineered by{" "}
           <strong className="text-gray-300">Rajan Pranshu Piyushkumar</strong>
         </p>
         <p className="mt-1 text-[11px] text-gray-600">

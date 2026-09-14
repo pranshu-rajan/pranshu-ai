@@ -21,13 +21,14 @@ router = APIRouter()
 async def get_status():
     ollama_up = await llm_client.is_ollama_available()
     doc_count = await get_doc_count()
+    provider, model_name = await llm_client.get_active_provider_info()
     return {
         "status": "healthy",
         "version": settings.VERSION,
-        "provider": "ollama" if ollama_up else ("cloud" if settings.GROQ_API_KEY or settings.OPENAI_API_KEY else "embedded"),
+        "provider": provider,
         "ollamaAvailable": ollama_up,
         "embedModel": settings.OLLAMA_EMBED_MODEL,
-        "genModel": settings.OLLAMA_GEN_MODEL,
+        "genModel": model_name,
         "cloudFallbackAvailable": bool(settings.GROQ_API_KEY or settings.OPENAI_API_KEY),
         "docCount": doc_count,
         "demoCount": len(vector_engine.items),
@@ -159,6 +160,8 @@ async def ask_rag(req: RagQueryRequest):
         f"Direct Answer:"
     )
 
+    provider, active_model = await llm_client.get_active_provider_info()
+
     if req.stream:
         async def event_generator():
             # Send context metadata first
@@ -166,7 +169,8 @@ async def ask_rag(req: RagQueryRequest):
                 "type": "meta",
                 "contexts": contexts,
                 "hyde_passage": hyde_passage,
-                "model": settings.OLLAMA_GEN_MODEL
+                "model": active_model,
+                "provider": provider
             }
             yield f"data: {json.dumps(meta_event)}\n\n"
 
@@ -177,9 +181,9 @@ async def ask_rag(req: RagQueryRequest):
 
             latency = round((time.perf_counter() - t0) * 1000, 1)
             full_ans = "".join(accumulated_answer)
-            await record_chat(req.question, full_ans, settings.OLLAMA_GEN_MODEL, contexts)
+            await record_chat(req.question, full_ans, f"{provider}:{active_model}", contexts)
             
-            yield f"data: {json.dumps({'type': 'done', 'latency_ms': latency})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'latency_ms': latency, 'model': active_model, 'provider': provider})}\n\n"
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -190,13 +194,13 @@ async def ask_rag(req: RagQueryRequest):
     answer = "".join(tokens)
     latency = round((time.perf_counter() - t0) * 1000, 1)
     
-    await record_chat(req.question, answer, settings.OLLAMA_GEN_MODEL, contexts)
+    await record_chat(req.question, answer, f"{provider}:{active_model}", contexts)
     
     doc_count = await get_doc_count()
     return RagResponse(
         answer=answer,
-        model=settings.OLLAMA_GEN_MODEL,
-        provider="ollama" if await llm_client.is_ollama_available() else "synthesizer",
+        model=active_model,
+        provider=provider,
         latency_ms=latency,
         contexts=contexts,
         docCount=doc_count,

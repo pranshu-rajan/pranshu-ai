@@ -3,7 +3,7 @@ import json
 import os
 import hashlib
 import numpy as np
-from typing import List, AsyncGenerator, Optional, Dict, Any
+from typing import List, AsyncGenerator, Optional, Dict, Any, Tuple
 from app.config import settings
 
 class LLMClient:
@@ -12,7 +12,14 @@ class LLMClient:
         self.embed_model = settings.OLLAMA_EMBED_MODEL
         self.gen_model = settings.OLLAMA_GEN_MODEL
         self.groq_api_key = settings.GROQ_API_KEY
+        self.groq_model = settings.GROQ_MODEL
         self.openai_api_key = settings.OPENAI_API_KEY
+
+    def reload_keys(self):
+        """Reload keys from environment if updated at runtime."""
+        self.groq_api_key = os.getenv("GROQ_API_KEY", settings.GROQ_API_KEY)
+        self.groq_model = os.getenv("GROQ_MODEL", settings.GROQ_MODEL)
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", settings.OPENAI_API_KEY)
 
     async def is_ollama_available(self) -> bool:
         try:
@@ -22,12 +29,18 @@ class LLMClient:
         except Exception:
             return False
 
+    async def get_active_provider_info(self) -> Tuple[str, str]:
+        self.reload_keys()
+        if self.groq_api_key:
+            return "groq", self.groq_model
+        if await self.is_ollama_available():
+            return "ollama", self.gen_model
+        return "embedded-engine", "Deterministic-v2"
+
     def _fallback_embedding(self, text: str, dims: int = 768) -> List[float]:
         """Deterministic semantic-like fallback vector when Ollama/APIs are offline."""
-        # Generates a normalized high-dimensional pseudo-embedding based on sha256 + token hashes
         seed = int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:8], 16)
         rng = np.random.RandomState(seed)
-        # Mix word level features
         words = text.lower().split()
         v = rng.normal(0, 1, dims).astype(np.float32)
         for w in words[:20]:
@@ -38,7 +51,22 @@ class LLMClient:
         return (v / norm).tolist()
 
     async def embed(self, text: str) -> List[float]:
-        # 1. Try Ollama
+        self.reload_keys()
+        # 1. If OpenAI Key present
+        if self.openai_api_key:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.post(
+                        "https://api.openai.com/v1/embeddings",
+                        headers={"Authorization": f"Bearer {self.openai_api_key}"},
+                        json={"model": "text-embedding-3-small", "input": text}
+                    )
+                    if res.status_code == 200:
+                        return res.json()["data"][0]["embedding"]
+            except Exception:
+                pass
+
+        # 2. Try Ollama
         if await self.is_ollama_available():
             try:
                 async with httpx.AsyncClient(timeout=15.0) as client:
@@ -53,25 +81,50 @@ class LLMClient:
             except Exception:
                 pass
 
-        # 2. Try OpenAI Embedding if key present
-        if self.openai_api_key:
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    res = await client.post(
-                        "https://api.openai.com/v1/embeddings",
-                        headers={"Authorization": f"Bearer {self.openai_api_key}"},
-                        json={"model": "text-embedding-3-small", "input": text}
-                    )
-                    if res.status_code == 200:
-                        return res.json()["data"][0]["embedding"]
-            except Exception:
-                pass
-
-        # 3. Deterministic fallback so system never crashes in demo/offline mode
+        # 3. Deterministic semantic vector (Fast, reliable, zero network dependency)
         return self._fallback_embedding(text)
 
     async def generate_stream(self, prompt: str, system_prompt: Optional[str] = None) -> AsyncGenerator[str, None]:
-        # 1. Try Ollama streaming
+        self.reload_keys()
+        
+        # 1. Prioritize Groq API (Blazing fast inference ~300+ tokens/sec)
+        if self.groq_api_key:
+            try:
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
+
+                async with httpx.AsyncClient(timeout=45.0) as client:
+                    async with client.stream(
+                        "POST",
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.groq_api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": self.groq_model,
+                            "messages": messages,
+                            "stream": True,
+                            "temperature": 0.2
+                        }
+                    ) as res:
+                        if res.status_code == 200:
+                            async for line in res.aiter_lines():
+                                if line.startswith("data: ") and line != "data: [DONE]":
+                                    data = json.loads(line[6:])
+                                    delta = data["choices"][0]["delta"].get("content", "")
+                                    if delta:
+                                        yield delta
+                            return
+                        else:
+                            error_body = await res.aread()
+                            print(f"Groq API Error {res.status_code}: {error_body.decode('utf-8')}")
+            except Exception as e:
+                print(f"Groq stream exception: {e}")
+
+        # 2. Local Ollama fallback
         if await self.is_ollama_available():
             try:
                 payload = {
@@ -94,43 +147,11 @@ class LLMClient:
             except Exception:
                 pass
 
-        # 2. Try Groq streaming if key available
-        if self.groq_api_key:
-            try:
-                messages = []
-                if system_prompt:
-                    messages.append({"role": "system", "content": system_prompt})
-                messages.append({"role": "user", "content": prompt})
-
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    async with client.stream(
-                        "POST",
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {self.groq_api_key}"},
-                        json={
-                            "model": "llama-3.3-70b-versatile",
-                            "messages": messages,
-                            "stream": True,
-                            "temperature": 0.3
-                        }
-                    ) as res:
-                        if res.status_code == 200:
-                            async for line in res.aiter_lines():
-                                if line.startswith("data: ") and line != "data: [DONE]":
-                                    data = json.loads(line[6:])
-                                    delta = data["choices"][0]["delta"].get("content", "")
-                                    if delta:
-                                        yield delta
-                            return
-            except Exception:
-                pass
-
-        # 3. Intelligent synthesized response when no external LLM is attached
+        # 3. Intelligent fallback synthesis when neither Groq nor Ollama is active
         yield f"Based on the retrieved context chunks:\n\n"
-        # Extract direct facts from the prompt context
         lines = [l.strip() for l in prompt.split("\n") if l.strip() and not l.startswith("Context:") and not l.startswith("Question:")]
         summary = " ".join(lines[:4])
-        yield f"Summary of retrieved evidence: {summary}\n\n"
-        yield "*(Note: To enable live model synthesis, start local Ollama with 'ollama run llama3.2' or set GROQ_API_KEY in your environment).* "
+        yield f"{summary}\n\n"
+        yield "*(Tip: Set your GROQ_API_KEY in backend/.env to unlock lightning-fast Groq LLaMA 3.3 70B generation!)* "
 
 llm_client = LLMClient()

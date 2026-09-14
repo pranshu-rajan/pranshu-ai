@@ -3,7 +3,7 @@ from typing import Optional
 import os
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "VectorDB Pro & Advanced RAG"
+    PROJECT_NAME: str = "Pranshu's AI"
     VERSION: str = "2.0.0"
     HOST: str = "0.0.0.0"
     PORT: int = 8000
@@ -11,13 +11,16 @@ class Settings(BaseSettings):
     # Core C++ Engine URL if running as sidecar
     CPP_CORE_URL: str = "http://localhost:8080"
     
-    # Ollama Settings
+    # Groq API Configuration (Fast Inference 300+ tps)
+    GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY", None)
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+    # Ollama Local Settings (Optional)
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     OLLAMA_EMBED_MODEL: str = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
     OLLAMA_GEN_MODEL: str = os.getenv("OLLAMA_GEN_MODEL", "llama3.2")
     
-    # Cloud AI Providers Fallback (for Cloud Deployment without local Ollama)
-    GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY", None)
+    # Other Providers
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY", None)
     
     # Database

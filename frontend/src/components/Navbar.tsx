@@ -30,14 +30,14 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, status 
           <div>
             <div className="flex items-center gap-2">
               <span className="font-bold tracking-tight text-white sm:text-lg">
-                VectorDB <span className="neon-text-cyan">Pro</span>
+                Pranshu&apos;s <span className="neon-text-cyan">AI</span>
               </span>
               <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-400">
                 v2.0 2026
               </span>
             </div>
             <p className="hidden text-xs text-gray-400 sm:block">
-              HNSW • KD-Tree • Hybrid Advanced RAG
+              Vector Database • HNSW • Groq Powered Advanced RAG
             </p>
           </div>
         </div>
@@ -69,13 +69,17 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, status 
           <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-[#12141c] px-3 py-1 text-xs text-gray-300 lg:flex">
             <span
               className={`h-2 w-2 rounded-full ${
-                status?.ollamaAvailable
+                status?.provider === "groq"
+                  ? "bg-amber-400 shadow-[0_0_8px_#f59e0b]"
+                  : status?.ollamaAvailable
                   ? "bg-emerald-400 shadow-[0_0_8px_#34d399]"
                   : "bg-cyan-400 shadow-[0_0_8px_#06b6d4]"
               }`}
             />
             <span className="font-mono text-[11px]">
-              {status?.ollamaAvailable
+              {status?.provider === "groq"
+                ? `Groq: ${status.genModel}`
+                : status?.ollamaAvailable
                 ? `Ollama: ${status.genModel}`
                 : status?.cloudFallbackAvailable
                 ? "Engine: Cloud/FastAPI"

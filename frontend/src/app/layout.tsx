@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "VectorDB Pro & Advanced RAG Studio",
-  description: "Production Vector Database from scratch with HNSW, KD-Tree, and Advanced Hybrid RAG Engine.",
+  title: "Pranshu's AI — Production Vector Database & Advanced RAG",
+  description: "High-performance vector database with HNSW, KD-Tree, Groq LLM inference, and Advanced RAG.",
 };
 
 export default function RootLayout({
