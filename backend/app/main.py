@@ -45,9 +45,20 @@ app.add_middleware(
 # Register routes
 app.include_router(api_router, prefix="/api")
 
-@app.get("/health")
+@app.api_route("/", methods=["GET", "HEAD"])
+async def root():
+    return {
+        "project": settings.PROJECT_NAME,
+        "status": "online",
+        "version": settings.VERSION,
+        "docs": "/docs",
+        "health": "/health",
+        "api": "/api/status"
+    }
+
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
-    return {"status": "ok", "service": "vectordb-fastapi", "version": settings.VERSION}
+    return {"status": "ok", "service": "pranshus-ai-backend", "version": settings.VERSION}
 
 if __name__ == "__main__":
     import uvicorn
