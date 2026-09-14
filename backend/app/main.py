@@ -60,6 +60,11 @@ async def root():
 async def health_check():
     return {"status": "ok", "service": "pranshus-ai-backend", "version": settings.VERSION}
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    from fastapi import Response
+    return Response(status_code=204)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host=settings.HOST, port=settings.PORT, reload=True)
