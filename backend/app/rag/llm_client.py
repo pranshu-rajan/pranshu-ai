@@ -32,7 +32,7 @@ class LLMClient:
     async def get_active_provider_info(self) -> Tuple[str, str]:
         self.reload_keys()
         if self.groq_api_key and len(self.groq_api_key.strip()) > 5:
-            model = (self.groq_model or "llama-3.3-70b-versatile").strip().strip('"').strip("'")
+            model = (self.groq_model or "openai/gpt-oss-120b").strip().strip('"').strip("'")
             return "groq", model
         if await self.is_ollama_available():
             return "ollama", self.gen_model
@@ -88,16 +88,18 @@ class LLMClient:
     async def generate_stream(self, prompt: str, system_prompt: Optional[str] = None) -> AsyncGenerator[str, None]:
         self.reload_keys()
         
-        # 1. Prioritize Groq API (Blazing fast inference ~300+ tokens/sec)
+        # 1. Prioritize Groq API with GPT-OSS-120B
         clean_key = (self.groq_api_key or "").strip().strip('"').strip("'")
         if clean_key and len(clean_key) > 5:
             models_to_try = [
-                (self.groq_model or "llama-3.1-8b-instant").strip().strip('"').strip("'"),
+                (self.groq_model or "openai/gpt-oss-120b").strip().strip('"').strip("'"),
+                "openai/gpt-oss-120b",
+                "gpt-oss-120b",
+                "openai/gpt-oss-20b",
+                "gpt-oss-20b",
                 "llama-3.1-8b-instant",
-                "llama-3.1-70b-versatile",
-                "llama3-70b-8192",
-                "llama3-8b-8192",
-                "mixtral-8x7b-32768"
+                "llama-3.3-70b-versatile",
+                "llama3-70b-8192"
             ]
             candidate_models = list(dict.fromkeys(models_to_try))
 

@@ -11,9 +11,9 @@ class Settings(BaseSettings):
     # Core C++ Engine URL if running as sidecar
     CPP_CORE_URL: str = "http://localhost:8080"
     
-    # Groq API Configuration (Fast Inference 300-800 tps)
+    # Groq API Configuration (Fast Inference ~500 tps)
     GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY", None)
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
     # Ollama Local Settings (Optional)
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")

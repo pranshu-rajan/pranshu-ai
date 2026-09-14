@@ -69,7 +69,7 @@ export default function Home() {
               <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">AI Provider</span>
               <p className="text-base font-bold font-mono text-white">
                 {status?.provider === "groq"
-                  ? "Groq Cloud (LLaMA 3.3)"
+                  ? `Groq Cloud (${status.genModel.replace("openai/", "").toUpperCase()})`
                   : status?.ollamaAvailable
                   ? "Local Ollama"
                   : "FastAPI Engine"}
