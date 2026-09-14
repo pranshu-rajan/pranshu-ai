@@ -31,8 +31,9 @@ class LLMClient:
 
     async def get_active_provider_info(self) -> Tuple[str, str]:
         self.reload_keys()
-        if self.groq_api_key:
-            return "groq", self.groq_model
+        if self.groq_api_key and len(self.groq_api_key.strip()) > 5:
+            model = (self.groq_model or "llama-3.3-70b-versatile").strip().strip('"').strip("'")
+            return "groq", model
         if await self.is_ollama_available():
             return "ollama", self.gen_model
         return "embedded-engine", "Deterministic-v2"
@@ -58,7 +59,7 @@ class LLMClient:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     res = await client.post(
                         "https://api.openai.com/v1/embeddings",
-                        headers={"Authorization": f"Bearer {self.openai_api_key}"},
+                        headers={"Authorization": f"Bearer {self.openai_api_key.strip()}"},
                         json={"model": "text-embedding-3-small", "input": text}
                     )
                     if res.status_code == 200:
@@ -88,7 +89,9 @@ class LLMClient:
         self.reload_keys()
         
         # 1. Prioritize Groq API (Blazing fast inference ~300+ tokens/sec)
-        if self.groq_api_key:
+        clean_key = (self.groq_api_key or "").strip().strip('"').strip("'")
+        if clean_key and len(clean_key) > 5:
+            model_name = (self.groq_model or "llama-3.3-70b-versatile").strip().strip('"').strip("'")
             try:
                 messages = []
                 if system_prompt:
@@ -100,11 +103,11 @@ class LLMClient:
                         "POST",
                         "https://api.groq.com/openai/v1/chat/completions",
                         headers={
-                            "Authorization": f"Bearer {self.groq_api_key}",
+                            "Authorization": f"Bearer {clean_key}",
                             "Content-Type": "application/json"
                         },
                         json={
-                            "model": self.groq_model,
+                            "model": model_name,
                             "messages": messages,
                             "stream": True,
                             "temperature": 0.2
@@ -119,10 +122,19 @@ class LLMClient:
                                         yield delta
                             return
                         else:
-                            error_body = await res.aread()
-                            print(f"Groq API Error {res.status_code}: {error_body.decode('utf-8')}")
+                            error_bytes = await res.aread()
+                            err_text = error_bytes.decode('utf-8', errors='ignore')
+                            try:
+                                err_json = json.loads(err_text)
+                                msg = err_json.get("error", {}).get("message", err_text)
+                            except Exception:
+                                msg = err_text
+                            yield f"⚠️ **Groq API Error ({res.status_code})**: {msg}\n\n"
+                            yield "*(Please double-check your `GROQ_API_KEY` on Render Dashboard > Environment to ensure it starts with `gsk_` without extra spaces or quotes).*"
+                            return
             except Exception as e:
-                print(f"Groq stream exception: {e}")
+                yield f"⚠️ **Groq Connection Failed**: {str(e)}\n\n"
+                return
 
         # 2. Local Ollama fallback
         if await self.is_ollama_available():
@@ -147,11 +159,14 @@ class LLMClient:
             except Exception:
                 pass
 
-        # 3. Intelligent fallback synthesis when neither Groq nor Ollama is active
-        yield f"Based on the retrieved context chunks:\n\n"
-        lines = [l.strip() for l in prompt.split("\n") if l.strip() and not l.startswith("Context:") and not l.startswith("Question:")]
-        summary = " ".join(lines[:4])
+        # 3. Informative response when Groq key is not set
+        yield "### 💡 Retrieved Context Chunks\n\n"
+        lines = [
+            l.strip() for l in prompt.split("\n")
+            if l.strip() and not l.startswith("Context:") and not l.startswith("Context Chunks:") and not l.startswith("User Question:") and not l.startswith("Direct Answer:")
+        ]
+        summary = "\n\n".join(lines[:3]) if lines else "Retrieved relevant chunks from the HNSW vector database."
         yield f"{summary}\n\n"
-        yield "*(Tip: Set your GROQ_API_KEY in backend/.env to unlock lightning-fast Groq LLaMA 3.3 70B generation!)* "
+        yield "---\n*Notice: Add `GROQ_API_KEY` in your Render Environment Variables to enable live LLaMA 3.3 70B conversational answers!*"
 
 llm_client = LLMClient()
