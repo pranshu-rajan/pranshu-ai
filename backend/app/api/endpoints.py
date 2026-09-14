@@ -109,13 +109,34 @@ async def upload_document(
 ):
     if file:
         content_bytes = await file.read()
-        extracted_text = content_bytes.decode("utf-8", errors="ignore")
-        doc_title = title or file.filename or "Uploaded Document"
+        filename = file.filename or "Uploaded Document"
+        doc_title = title or filename
+        
+        # Check if PDF
+        if filename.lower().endswith(".pdf"):
+            import re
+            pdf_str = content_bytes.decode("latin1", errors="ignore")
+            # Extract parenthesized strings inside Tj or TJ blocks
+            matches = re.findall(r'\((.*?)\)\s*Tj', pdf_str)
+            if not matches:
+                matches = re.findall(r'\[(.*?)\]\s*TJ', pdf_str)
+            if matches:
+                extracted_text = " ".join([m.replace(r'\(', '(').replace(r'\)', ')') for m in matches])
+            else:
+                # Extract ASCII words
+                extracted_text = " ".join(re.findall(r'[A-Za-z0-9\s,\.\?\!\-\:;]{4,}', pdf_str))
+            if len(extracted_text.strip()) < 30:
+                extracted_text = content_bytes.decode("utf-8", errors="ignore")
+        else:
+            extracted_text = content_bytes.decode("utf-8", errors="ignore")
     elif text and title:
         extracted_text = text
         doc_title = title
     else:
         raise HTTPException(status_code=400, detail="Must provide either text and title, or a file")
+
+    if not extracted_text.strip():
+        raise HTTPException(status_code=400, detail="The uploaded file or text is empty")
 
     doc_id = await rag_pipeline.ingest_document(doc_title, extracted_text)
     return {"doc_id": doc_id, "title": doc_title, "status": "indexed"}

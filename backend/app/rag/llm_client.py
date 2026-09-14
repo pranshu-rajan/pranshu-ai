@@ -91,50 +91,63 @@ class LLMClient:
         # 1. Prioritize Groq API (Blazing fast inference ~300+ tokens/sec)
         clean_key = (self.groq_api_key or "").strip().strip('"').strip("'")
         if clean_key and len(clean_key) > 5:
-            model_name = (self.groq_model or "llama-3.3-70b-versatile").strip().strip('"').strip("'")
-            try:
-                messages = []
-                if system_prompt:
-                    messages.append({"role": "system", "content": system_prompt})
-                messages.append({"role": "user", "content": prompt})
+            models_to_try = [
+                (self.groq_model or "llama-3.1-8b-instant").strip().strip('"').strip("'"),
+                "llama-3.1-8b-instant",
+                "llama-3.1-70b-versatile",
+                "llama3-70b-8192",
+                "llama3-8b-8192",
+                "mixtral-8x7b-32768"
+            ]
+            candidate_models = list(dict.fromkeys(models_to_try))
 
-                async with httpx.AsyncClient(timeout=45.0) as client:
-                    async with client.stream(
-                        "POST",
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {clean_key}",
-                            "Content-Type": "application/json"
-                        },
-                        json={
-                            "model": model_name,
-                            "messages": messages,
-                            "stream": True,
-                            "temperature": 0.2
-                        }
-                    ) as res:
-                        if res.status_code == 200:
-                            async for line in res.aiter_lines():
-                                if line.startswith("data: ") and line != "data: [DONE]":
-                                    data = json.loads(line[6:])
-                                    delta = data["choices"][0]["delta"].get("content", "")
-                                    if delta:
-                                        yield delta
-                            return
-                        else:
-                            error_bytes = await res.aread()
-                            err_text = error_bytes.decode('utf-8', errors='ignore')
-                            try:
-                                err_json = json.loads(err_text)
-                                msg = err_json.get("error", {}).get("message", err_text)
-                            except Exception:
-                                msg = err_text
-                            yield f"⚠️ **Groq API Error ({res.status_code})**: {msg}\n\n"
-                            yield "*(Please double-check your `GROQ_API_KEY` on Render Dashboard > Environment to ensure it starts with `gsk_` without extra spaces or quotes).*"
-                            return
-            except Exception as e:
-                yield f"⚠️ **Groq Connection Failed**: {str(e)}\n\n"
-                return
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            for m in candidate_models:
+                try:
+                    async with httpx.AsyncClient(timeout=45.0) as client:
+                        async with client.stream(
+                            "POST",
+                            "https://api.groq.com/openai/v1/chat/completions",
+                            headers={
+                                "Authorization": f"Bearer {clean_key}",
+                                "Content-Type": "application/json"
+                            },
+                            json={
+                                "model": m,
+                                "messages": messages,
+                                "stream": True,
+                                "temperature": 0.2
+                            }
+                        ) as res:
+                            if res.status_code == 200:
+                                self.groq_model = m
+                                async for line in res.aiter_lines():
+                                    if line.startswith("data: ") and line != "data: [DONE]":
+                                        data = json.loads(line[6:])
+                                        delta = data["choices"][0]["delta"].get("content", "")
+                                        if delta:
+                                            yield delta
+                                return
+                            elif res.status_code == 404:
+                                # Try next model
+                                continue
+                            else:
+                                error_bytes = await res.aread()
+                                err_text = error_bytes.decode('utf-8', errors='ignore')
+                                try:
+                                    err_json = json.loads(err_text)
+                                    msg = err_json.get("error", {}).get("message", err_text)
+                                except Exception:
+                                    msg = err_text
+                                yield f"⚠️ **Groq API Error ({res.status_code})**: {msg}\n\n"
+                                return
+                except Exception as e:
+                    yield f"⚠️ **Groq Connection Failed**: {str(e)}\n\n"
+                    return
 
         # 2. Local Ollama fallback
         if await self.is_ollama_available():

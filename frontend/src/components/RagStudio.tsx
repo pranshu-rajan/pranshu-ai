@@ -12,7 +12,11 @@ export const RagStudio: React.FC = () => {
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [docTitle, setDocTitle] = useState("");
   const [docText, setDocText] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadMode, setUploadMode] = useState<"file" | "text">("file");
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // RAG Chat State
   const [question, setQuestion] = useState("");
@@ -38,14 +42,42 @@ export const RagStudio: React.FC = () => {
     loadDocs();
   }, []);
 
+  const handleFileChange = (file: File) => {
+    setSelectedFile(file);
+    if (!docTitle) {
+      // Auto-set title from file name without extension
+      const cleanName = file.name.replace(/\.[^/.]+$/, "");
+      setDocTitle(cleanName);
+    }
+    // If text file, read preview
+    if (file.name.match(/\.(txt|md|json|csv|py|cpp|js|ts)$/i)) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        if (content) setDocText(content);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileChange(e.dataTransfer.files[0]);
+    }
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!docTitle || !docText) return;
+    if (!selectedFile && (!docTitle || !docText)) return;
     setUploading(true);
     try {
-      await uploadDocument(docTitle, docText);
+      await uploadDocument(docTitle, docText, selectedFile || undefined);
       setDocTitle("");
       setDocText("");
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       await loadDocs();
     } catch (err) {
       console.error(err);
@@ -104,36 +136,145 @@ export const RagStudio: React.FC = () => {
             <h3 className="text-sm font-semibold text-white">Ingest Documents</h3>
           </div>
 
-          <form onSubmit={handleUpload} className="mt-4 space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-300">Document Title</label>
-              <input
-                type="text"
-                placeholder="e.g. Distributed Consensus Systems"
-                value={docTitle}
-                onChange={(e) => setDocTitle(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
-              />
-            </div>
+          {/* Mode Switcher */}
+          <div className="mt-3 flex rounded-xl border border-white/10 bg-[#090a0f] p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setUploadMode("file")}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 transition font-medium ${
+                uploadMode === "file"
+                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              <span>Upload File (.pdf, .txt, .md)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setUploadMode("text")}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 transition font-medium ${
+                uploadMode === "text"
+                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>Paste Raw Text</span>
+            </button>
+          </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-300">Content / Article</label>
-              <textarea
-                rows={4}
-                placeholder="Paste text, documentation, or notes..."
-                value={docText}
-                onChange={(e) => setDocText(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none resize-none"
-              />
-            </div>
+          <form onSubmit={handleUpload} className="mt-4 space-y-3">
+            {uploadMode === "file" ? (
+              <div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".txt,.md,.pdf,.json,.csv,.py,.cpp,.js,.ts,.doc"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleFileChange(e.target.files[0]);
+                    }
+                  }}
+                  className="hidden"
+                />
+
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                  className={`group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition ${
+                    isDragging
+                      ? "border-cyan-400 bg-cyan-500/10"
+                      : selectedFile
+                      ? "border-emerald-500/40 bg-emerald-500/5"
+                      : "border-white/15 bg-[#12141c] hover:border-cyan-500/40 hover:bg-white/5"
+                  }`}
+                >
+                  {selectedFile ? (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
+                        <CheckCircle className="h-5 w-5" />
+                      </div>
+                      <p className="text-xs font-semibold text-white truncate max-w-[220px]">
+                        {selectedFile.name}
+                      </p>
+                      <span className="font-mono text-[10px] text-gray-400">
+                        {(selectedFile.size / 1024).toFixed(1)} KB
+                      </span>
+                      <span className="text-[10px] text-cyan-400 underline mt-1">
+                        Click to choose another file
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 group-hover:scale-105 transition">
+                        <Upload className="h-5 w-5" />
+                      </div>
+                      <p className="text-xs font-medium text-gray-200">
+                        Click to browse or drag & drop document
+                      </p>
+                      <p className="text-[10px] text-gray-500">
+                        Supports PDF, TXT, Markdown, CSV, Code files
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-300">Document Label / Title</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Deep Learning Architecture"
+                    value={docTitle}
+                    onChange={(e) => setDocTitle(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-300">Document Title</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Distributed Consensus Systems"
+                    value={docTitle}
+                    onChange={(e) => setDocTitle(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-300">Content / Article</label>
+                  <textarea
+                    rows={4}
+                    placeholder="Paste text, documentation, or notes..."
+                    value={docText}
+                    onChange={(e) => setDocText(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#12141c] px-3 py-2 text-xs text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none resize-none"
+                  />
+                </div>
+              </>
+            )}
 
             <button
               type="submit"
-              disabled={uploading || !docTitle || !docText}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500/20 py-2 text-xs font-semibold text-cyan-300 border border-cyan-500/40 transition hover:bg-cyan-500/30 disabled:opacity-40"
+              disabled={uploading || (!selectedFile && (!docTitle || !docText))}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500/20 py-2.5 text-xs font-semibold text-cyan-300 border border-cyan-500/40 transition hover:bg-cyan-500/30 disabled:opacity-40"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              <span>{uploading ? "Chunking & Embedding into HNSW..." : "Embed & Ingest Document"}</span>
+              <span>
+                {uploading
+                  ? "Chunking & Indexing into HNSW..."
+                  : selectedFile
+                  ? `Upload & Index "${selectedFile.name}"`
+                  : "Embed & Ingest Document"}
+              </span>
             </button>
           </form>
         </div>
