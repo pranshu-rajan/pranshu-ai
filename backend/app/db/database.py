@@ -2,6 +2,8 @@ import sqlite3
 import asyncio
 import json
 import os
+import re
+import urllib.parse
 from typing import List, Dict, Any, Optional
 from app.config import settings
 
@@ -18,9 +20,16 @@ def _get_pg_connection():
     import psycopg2
     from psycopg2.extras import RealDictCursor
     raw_url = settings.DATABASE_URL.strip()
-    # Normalize postgres:// to postgresql:// for standard driver handling
     if raw_url.startswith("postgres://"):
         raw_url = "postgresql://" + raw_url[len("postgres://"):]
+    
+    # Auto-encode special characters in password (like #, ?, etc.) if raw
+    m = re.match(r'^(postgresql?://)([^:]+):(.*)@([^@]+)$', raw_url)
+    if m:
+        prefix, user, password, host_part = m.groups()
+        encoded_pass = urllib.parse.quote_plus(urllib.parse.unquote_plus(password))
+        raw_url = f"{prefix}{user}:{encoded_pass}@{host_part}"
+
     return psycopg2.connect(raw_url, cursor_factory=RealDictCursor, connect_timeout=5)
 
 def _get_sqlite_connection():
