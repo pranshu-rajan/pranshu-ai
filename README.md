@@ -10,8 +10,8 @@ Developed and engineered by **[Rajan Pranshu Piyushkumar](https://github.com/pra
 ## ⚡ Groq Cloud Integration (Fastest LLM Inference)
 
 **Pranshu's AI** leverages **Groq LPU™ Inference Engine** to deliver ultra-fast streaming responses at **300–500 tokens/second**:
-- **Default Model**: `llama-3.3-70b-versatile` (State-of-the-art reasoning, 128k context window).
-- **Alternative Fast Model**: `llama-3.1-8b-instant`.
+- **Default Model**: `openai/gpt-oss-120b` (Next-gen open-weight 120B reasoning model).
+- **Alternative Fast Models**: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`.
 - **Zero Local Hardware Requirement**: Runs 100% in the cloud without requiring a local GPU or local Ollama.
 - **Get Free API Key**: [Groq Console](https://console.groq.com/keys) (Takes 30 seconds).
 
@@ -63,7 +63,7 @@ Follow this guide to deploy the entire full-stack system live to the web.
    - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 5. Under **Environment Variables**, add:
    - `GROQ_API_KEY`: `gsk_...` (your Groq API key)
-   - `GROQ_MODEL`: `llama-3.3-70b-versatile`
+   - `GROQ_MODEL`: `openai/gpt-oss-120b`
 6. Click **"Deploy Web Service"**.
 7. Once deployed, copy your backend URL (e.g., `https://pranshus-ai-backend.onrender.com`).
    - Test it by visiting `https://pranshus-ai-backend.onrender.com/health` in your browser.

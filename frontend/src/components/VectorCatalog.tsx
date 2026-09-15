@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { VectorItem } from "../lib/types";
+import { fetchVectors, insertVector, deleteVector } from "../lib/api";
 import { Database, Plus, Trash2, Search, Tag, Eye } from "lucide-react";
 
 export const VectorCatalog: React.FC = () => {
@@ -15,12 +16,9 @@ export const VectorCatalog: React.FC = () => {
 
   const loadVectors = async () => {
     try {
-      const res = await fetch("/api/vectors");
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data);
-        return;
-      }
+      const data = await fetchVectors();
+      setItems(data);
+      return;
     } catch (e) {
       // Fallback
     }
@@ -44,11 +42,7 @@ export const VectorCatalog: React.FC = () => {
     // Generate normalized 16D pseudo vector
     const vec = Array.from({ length: 16 }, () => Number((Math.random() * 0.9).toFixed(2)));
     try {
-      await fetch("/api/vectors", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metadata: newMeta, category: newCat, embedding: vec }),
-      });
+      await insertVector({ metadata: newMeta, category: newCat, embedding: vec });
       await loadVectors();
       setNewMeta("");
       setShowAddModal(false);
@@ -59,7 +53,7 @@ export const VectorCatalog: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     try {
-      await fetch(`/api/vectors/${id}`, { method: "DELETE" });
+      await deleteVector(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
     } catch (e) {
       console.error(e);

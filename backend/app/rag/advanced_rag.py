@@ -1,5 +1,6 @@
 import re
 import math
+import asyncio
 import numpy as np
 from typing import List, Dict, Any, Tuple, Optional
 from collections import Counter
@@ -123,13 +124,35 @@ class AdvancedRAGPipeline:
     async def ingest_document(self, title: str, text: str, tags: str = "general") -> int:
         doc_id = await insert_document(title, text, tags)
         chunks = recursive_chunk_text(text)
-        
-        for idx, chunk_str in enumerate(chunks):
-            chunk_title = f"{title} [{idx + 1}/{len(chunks)}]" if len(chunks) > 1 else title
-            emb = await llm_client.embed(chunk_str)
-            await insert_chunk(doc_id, idx, chunk_title, chunk_str, emb)
+        if not chunks:
+            return doc_id
 
-        await self.reload_index()
+        # Concurrent bounded embedding (up to 8 parallel workers)
+        semaphore = asyncio.Semaphore(8)
+        async def embed_chunk(chunk_str: str):
+            async with semaphore:
+                return await llm_client.embed(chunk_str)
+
+        embeddings = await asyncio.gather(*(embed_chunk(c) for c in chunks))
+
+        dist_fn = get_dist_fn("cosine")
+        for idx, (chunk_str, emb) in enumerate(zip(chunks, embeddings)):
+            chunk_title = f"{title} [{idx + 1}/{len(chunks)}]" if len(chunks) > 1 else title
+            chunk_id = await insert_chunk(doc_id, idx, chunk_title, chunk_str, emb)
+            chunk_obj = {
+                "id": chunk_id,
+                "doc_id": doc_id,
+                "chunk_index": idx,
+                "title": chunk_title,
+                "text": chunk_str,
+                "embedding": emb
+            }
+            self.chunks_cache[chunk_id] = chunk_obj
+            self.hnsw.insert(chunk_id, chunk_title, "document", np.array(emb, dtype=np.float32), dist_fn)
+
+        # Update BM25 with all current chunks in memory
+        self.bm25.build(list(self.chunks_cache.values()))
+        self.is_initialized = True
         return doc_id
 
     def reciprocal_rank_fusion(self, dense_results: List[Tuple[float, int]], sparse_results: List[Tuple[float, int]], k_rrf: int = 60) -> List[Tuple[float, int]]:

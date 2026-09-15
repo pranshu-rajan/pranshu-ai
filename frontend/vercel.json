@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "headers": [
+    {
+      "source": "/api/rag/ask",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-transform"
+        },
+        {
+          "key": "X-Accel-Buffering",
+          "value": "no"
+        },
+        {
+          "key": "Connection",
+          "value": "keep-alive"
+        }
+      ]
+    }
+  ]
+}

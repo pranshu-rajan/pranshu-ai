@@ -3,7 +3,38 @@ import {
   DocumentItem, DocumentChunk, SystemStatus
 } from "./types";
 
-const API_BASE = ""; // Relative proxy via next.config.ts rewrites or direct
+export function getApiBase(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl && envUrl.trim() !== "") {
+    return envUrl.trim().replace(/\/+$/, "");
+  }
+  return "";
+}
+
+export const API_BASE = getApiBase();
+
+export async function fetchVectors(): Promise<VectorItem[]> {
+  const res = await fetch(`${API_BASE}/api/vectors`);
+  if (!res.ok) throw new Error("Failed to fetch vectors");
+  return await res.json();
+}
+
+export async function insertVector(item: { metadata: string; category: string; embedding: number[] }): Promise<{ id: number; status: string }> {
+  const res = await fetch(`${API_BASE}/api/vectors`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(item),
+  });
+  if (!res.ok) throw new Error("Failed to insert vector");
+  return await res.json();
+}
+
+export async function deleteVector(id: number): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/api/vectors/${id}`, {
+    method: "DELETE",
+  });
+  return res.ok;
+}
 
 export async function fetchStatus(): Promise<SystemStatus> {
   try {

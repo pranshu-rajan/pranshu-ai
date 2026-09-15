@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY", None)
     
     # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./vectordb.sqlite3"
-    DB_FILE: str = "vectordb.sqlite3"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./vectordb.sqlite3")
+    DB_FILE: str = os.getenv("DB_FILE", "vectordb.sqlite3")
     
     # Advanced RAG Parameters
     DEFAULT_TOP_K: int = 4
