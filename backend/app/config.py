@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     # Other Providers
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY", None)
     
-    # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./vectordb.sqlite3")
+    # Database (Supabase PostgreSQL or fallback SQLite)
+    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL", None)
     DB_FILE: str = os.getenv("DB_FILE", "vectordb.sqlite3")
     
     # Advanced RAG Parameters

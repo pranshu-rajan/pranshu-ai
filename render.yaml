@@ -14,9 +14,5 @@ services:
         value: openai/gpt-oss-120b
       - key: GROQ_API_KEY
         sync: false
-      - key: DB_FILE
-        value: /app/data/vectordb.sqlite3
-    disk:
-      name: backend-data
-      mountPath: /app/data
-      sizeGB: 1
+      - key: DATABASE_URL
+        sync: false

@@ -26,19 +26,19 @@ Follow this guide to deploy the entire full-stack system live to the web.
                   │    Next.js 15 Frontend        │
                   │     Deployed on VERCEL        │
                   └──────────────┬────────────────┘
-                                 │ HTTPS / SSE
+                                 │ Direct HTTPS / SSE
                                  ▼
                   ┌───────────────────────────────┐
                   │      FastAPI Backend          │
-                  │   Deployed on RENDER / RAILWAY│
+                  │     Deployed on RENDER        │
                   └──────────────┬────────────────┘
                                  │
-                 ┌───────────────┴───────────────┐
-                 ▼                               ▼
-       ┌──────────────────┐            ┌───────────────────┐
-       │   Groq API Cloud │            │ Native HNSW Index │
-       │ (LLaMA 3.3 70B)  │            │ (Persistent SQLite│
-       └──────────────────┘            └───────────────────┘
+                 ┌───────────────┼───────────────┐
+                 ▼               ▼               ▼
+       ┌──────────────────┐ ┌───────────────┐ ┌───────────────────┐
+       │   Groq API Cloud │ │   Supabase    │ │ In-Memory HNSW    │
+       │  (GPT-OSS 120B)  │ │ (PostgreSQL)  │ │ + Hybrid BM25     │
+       └──────────────────┘ └───────────────┘ └───────────────────┘
 ```
 
 ### Step 1: Get your Free Groq API Key
