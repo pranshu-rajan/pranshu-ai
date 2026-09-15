@@ -5,7 +5,12 @@ import os
 from typing import List, Dict, Any, Optional
 from app.config import settings
 
+_USE_POSTGRES: Optional[bool] = None
+
 def is_postgres() -> bool:
+    global _USE_POSTGRES
+    if _USE_POSTGRES is not None:
+        return _USE_POSTGRES
     url = (settings.DATABASE_URL or "").strip()
     return url.startswith("postgres://") or url.startswith("postgresql://")
 
@@ -16,7 +21,7 @@ def _get_pg_connection():
     # Normalize postgres:// to postgresql:// for standard driver handling
     if raw_url.startswith("postgres://"):
         raw_url = "postgresql://" + raw_url[len("postgres://"):]
-    return psycopg2.connect(raw_url, cursor_factory=RealDictCursor)
+    return psycopg2.connect(raw_url, cursor_factory=RealDictCursor, connect_timeout=5)
 
 def _get_sqlite_connection():
     db_path = settings.DB_FILE
@@ -28,40 +33,49 @@ def _get_sqlite_connection():
     return conn
 
 def _sync_init_db():
+    global _USE_POSTGRES
     if is_postgres():
-        with _get_pg_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS documents (
-                        id BIGSERIAL PRIMARY KEY,
-                        title TEXT NOT NULL,
-                        tags TEXT DEFAULT 'general',
-                        raw_text TEXT NOT NULL,
-                        chunk_count INTEGER DEFAULT 0,
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                    );
-                """)
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS chunks (
-                        id BIGSERIAL PRIMARY KEY,
-                        doc_id BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-                        chunk_index INTEGER NOT NULL,
-                        title TEXT NOT NULL,
-                        text TEXT NOT NULL,
-                        embedding TEXT NOT NULL
-                    );
-                """)
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS chat_history (
-                        id BIGSERIAL PRIMARY KEY,
-                        question TEXT NOT NULL,
-                        answer TEXT NOT NULL,
-                        provider TEXT NOT NULL,
-                        contexts TEXT,
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                    );
-                """)
-            conn.commit()
+        try:
+            with _get_pg_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS documents (
+                            id BIGSERIAL PRIMARY KEY,
+                            title TEXT NOT NULL,
+                            tags TEXT DEFAULT 'general',
+                            raw_text TEXT NOT NULL,
+                            chunk_count INTEGER DEFAULT 0,
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS chunks (
+                            id BIGSERIAL PRIMARY KEY,
+                            doc_id BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                            chunk_index INTEGER NOT NULL,
+                            title TEXT NOT NULL,
+                            text TEXT NOT NULL,
+                            embedding TEXT NOT NULL
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS chat_history (
+                            id BIGSERIAL PRIMARY KEY,
+                            question TEXT NOT NULL,
+                            answer TEXT NOT NULL,
+                            provider TEXT NOT NULL,
+                            contexts TEXT,
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+                conn.commit()
+            _USE_POSTGRES = True
+            print("✅ Successfully connected to Supabase PostgreSQL!")
+            return
+        except Exception as e:
+            print(f"⚠️ Supabase PostgreSQL connection error: {e}")
+            print("⚠️ Falling back to local SQLite so server can boot and remain online.")
+            _USE_POSTGRES = False
     else:
         with _get_sqlite_connection() as conn:
             cursor = conn.cursor()
