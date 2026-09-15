@@ -2,6 +2,7 @@
   "name": "vectordb-pro-frontend",
   "version": "2.0.0",
   "private": true,
+  "homepage": "https://pranshu-ai.vercel.app",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

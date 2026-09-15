@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://pranshu-ai.vercel.app"),
   title: "Pranshu's AI — Production Vector Database & Advanced RAG",
   description: "High-performance vector database with HNSW, KD-Tree, Groq LLM inference, and Advanced RAG.",
 };

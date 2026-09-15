@@ -1,7 +1,17 @@
 # Pranshu's AI — Vector Database & Advanced RAG Studio
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-blue?style=for-the-badge&logo=vercel)](https://pranshu-ai.vercel.app)
+[![API Gateway](https://img.shields.io/badge/API%20Gateway-Render-46E3B7?style=for-the-badge&logo=render)](https://pranshu-ai.onrender.com)
+[![Swagger Docs](https://img.shields.io/badge/FastAPI-Docs-009688?style=for-the-badge&logo=fastapi)](https://pranshu-ai.onrender.com/docs)
+[![Database](https://img.shields.io/badge/Database-Supabase-3ECF8E?style=for-the-badge&logo=supabase)](https://supabase.com)
+
 > **A Production-Grade Full-Stack Vector Database and Advanced RAG Knowledge Engine built from scratch.**  
-> Powered by **Groq Cloud Inference (`llama-3.3-70b-versatile`)**, native **C++ & Async Python HNSW**, **KD-Tree**, **Hybrid Search (Dense + BM25 via Reciprocal Rank Fusion)**, **Contextual Reranking**, and an interactive 2026 Next.js 15 cyber-glassmorphic frontend.
+> Powered by **Groq Cloud Inference (`openai/gpt-oss-120b`)**, native **C++ & Async Python HNSW**, **KD-Tree**, **Hybrid Search (Dense + BM25 via Reciprocal Rank Fusion)**, **Contextual Reranking**, **Supabase PostgreSQL**, and an interactive 2026 Next.js 15 cyber-glassmorphic frontend.
+
+- 🌐 **Live Web Application**: [https://pranshu-ai.vercel.app](https://pranshu-ai.vercel.app)
+- ⚡ **Live Production API**: [https://pranshu-ai.onrender.com](https://pranshu-ai.onrender.com)
+- 📚 **Interactive Swagger API Docs**: [https://pranshu-ai.onrender.com/docs](https://pranshu-ai.onrender.com/docs)
+- 🩺 **Health Check**: [https://pranshu-ai.onrender.com/health](https://pranshu-ai.onrender.com/health)
 
 Developed and engineered by **[Rajan Pranshu Piyushkumar](https://github.com/pranshu-rajan)**.
 
@@ -65,8 +75,8 @@ Follow this guide to deploy the entire full-stack system live to the web.
    - `GROQ_API_KEY`: `gsk_...` (your Groq API key)
    - `GROQ_MODEL`: `openai/gpt-oss-120b`
 6. Click **"Deploy Web Service"**.
-7. Once deployed, copy your backend URL (e.g., `https://pranshus-ai-backend.onrender.com`).
-   - Test it by visiting `https://pranshus-ai-backend.onrender.com/health` in your browser.
+7. Once deployed, copy your backend URL: `https://pranshu-ai.onrender.com`.
+   - Test it by visiting `https://pranshu-ai.onrender.com/health` in your browser.
 
 #### Option B: Deploy on [Railway](https://railway.app)
 1. Go to [Railway Dashboard](https://railway.app) and click **"New Project"** → **"Deploy from GitHub repo"**.
@@ -74,6 +84,7 @@ Follow this guide to deploy the entire full-stack system live to the web.
 3. In service settings, set **Root Directory** to `/backend`.
 4. Add environment variables:
    - `GROQ_API_KEY`: `gsk_...`
+   - `DATABASE_URL`: `postgresql://...`
 5. Railway will automatically detect the Python environment or Dockerfile and deploy!
 
 ---
@@ -87,9 +98,9 @@ Follow this guide to deploy the entire full-stack system live to the web.
    - **Root Directory**: Click **Edit** and select `frontend`.
 4. In the **Environment Variables** section, add:
    - **Key**: `NEXT_PUBLIC_API_URL`
-   - **Value**: Your live backend URL from Step 2 (e.g. `https://pranshus-ai-backend.onrender.com` without trailing slash).
+   - **Value**: `https://pranshu-ai.onrender.com` (without trailing slash).
 5. Click **"Deploy"**.
-6. Vercel will build and publish your app in ~60 seconds to a live URL (e.g. `https://pranshus-ai.vercel.app`).
+6. Vercel will build and publish your app in ~60 seconds to your live domain: [https://pranshu-ai.vercel.app](https://pranshu-ai.vercel.app).
 
 ---
 
