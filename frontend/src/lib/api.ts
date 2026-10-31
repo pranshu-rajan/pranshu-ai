@@ -186,7 +186,7 @@ export async function askRagStream(
   question: string,
   k: number,
   options: { useHybrid: boolean; useRerank: boolean; useHyde: boolean },
-  onMeta: (meta: { contexts: DocumentChunk[]; hydePassage?: string; model: string }) => void,
+  onMeta: (meta: { contexts: DocumentChunk[]; hydePassage?: string; model: string; confidence?: string }) => void,
   onToken: (token: string) => void,
   onDone: (latencyMs: number) => void,
   onError: (err: any) => void
@@ -235,6 +235,7 @@ export async function askRagStream(
                 contexts: data.contexts || [],
                 hydePassage: data.hyde_passage,
                 model: data.model,
+                confidence: data.confidence,
               });
             } else if (data.type === "token") {
               onToken(data.token);

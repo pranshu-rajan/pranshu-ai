@@ -50,6 +50,7 @@ export interface DocumentChunk {
   distance?: number;
   rrf_score?: number;
   rerank_score?: number;
+  confidence?: "high" | "medium" | "low" | string;
 }
 
 export interface DocumentItem {

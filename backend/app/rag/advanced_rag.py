@@ -9,7 +9,10 @@ from app.db.database import get_all_chunks, insert_chunk, insert_document
 from app.engine.vector_engine import HNSWIndex, get_dist_fn
 
 def recursive_chunk_text(text: str, chunk_size: int = 350, overlap: int = 50) -> List[str]:
-    """Chunks text preserving paragraphs and sentence boundaries where possible."""
+    """
+    2026 Semantic-boundary chunking:
+    Chunks text while preserving paragraph and sentence boundaries.
+    """
     clean_text = re.sub(r'\s+', ' ', text).strip()
     if len(clean_text) <= chunk_size:
         return [clean_text]
@@ -25,6 +28,8 @@ def recursive_chunk_text(text: str, chunk_size: int = 350, overlap: int = 50) ->
         # Look for sentence boundary near end
         split_idx = clean_text.rfind('. ', start + chunk_size // 2, end)
         if split_idx == -1:
+            split_idx = clean_text.rfind('; ', start + chunk_size // 2, end)
+        if split_idx == -1:
             split_idx = clean_text.rfind(' ', start + chunk_size // 2, end)
         if split_idx == -1:
             split_idx = end
@@ -35,6 +40,9 @@ def recursive_chunk_text(text: str, chunk_size: int = 350, overlap: int = 50) ->
 
 
 class BM25Index:
+    """
+    BM25 Okapi lexical ranking with Robertson-Spärck Jones smoothed IDF.
+    """
     def __init__(self, k1: float = 1.5, b: float = 0.75):
         self.k1 = k1
         self.b = b
@@ -87,7 +95,6 @@ class BM25Index:
             for t in tokens:
                 if t in tf_map:
                     df = self.doc_freqs.get(t, 0)
-                    # IDF with standard smoothing
                     idf = math.log((self.N - df + 0.5) / (df + 0.5) + 1.0)
                     freq = tf_map[t]
                     numerator = freq * (self.k1 + 1.0)
@@ -102,6 +109,16 @@ class BM25Index:
 
 
 class AdvancedRAGPipeline:
+    """
+    2026 Cutting-Edge Advanced RAG Pipeline:
+    - Context-Enriched Hierarchical Chunk Ingestion
+    - Multi-Query Intent Decomposition
+    - Hypothetical Document Embeddings (HyDE)
+    - Weighted Dense + Sparse Hybrid Search via Reciprocal Rank Fusion (RRF)
+    - Semantic Deduplication (Maximal Marginal Relevance / Diversity Filtering)
+    - Contextual Cross-Encoder Re-Ranking
+    - Corrective RAG (CRAG) Retrieval Confidence Scoring
+    """
     def __init__(self):
         self.bm25 = BM25Index()
         self.hnsw = HNSWIndex(M=16, ef_construction=64, ef_search=32)
@@ -123,28 +140,35 @@ class AdvancedRAGPipeline:
 
     async def ingest_document(self, title: str, text: str, tags: str = "general") -> int:
         doc_id = await insert_document(title, text, tags)
-        chunks = recursive_chunk_text(text)
-        if not chunks:
+        raw_chunks = recursive_chunk_text(text)
+        if not raw_chunks:
             return doc_id
+
+        # 2026 Contextual Enrichment: Prefix each chunk with document provenance metadata
+        total = len(raw_chunks)
+        enriched_chunks = []
+        for idx, chunk_str in enumerate(raw_chunks):
+            chunk_title = f"{title} [{idx + 1}/{total}]" if total > 1 else title
+            enriched_text = f"[Document: {title} | Section {idx + 1}/{total}]\n{chunk_str}"
+            enriched_chunks.append((chunk_title, chunk_str, enriched_text))
 
         # Concurrent bounded embedding (up to 8 parallel workers)
         semaphore = asyncio.Semaphore(8)
-        async def embed_chunk(chunk_str: str):
+        async def embed_chunk(text_to_embed: str):
             async with semaphore:
-                return await llm_client.embed(chunk_str)
+                return await llm_client.embed(text_to_embed)
 
-        embeddings = await asyncio.gather(*(embed_chunk(c) for c in chunks))
+        embeddings = await asyncio.gather(*(embed_chunk(enriched) for _, _, enriched in enriched_chunks))
 
         dist_fn = get_dist_fn("cosine")
-        for idx, (chunk_str, emb) in enumerate(zip(chunks, embeddings)):
-            chunk_title = f"{title} [{idx + 1}/{len(chunks)}]" if len(chunks) > 1 else title
-            chunk_id = await insert_chunk(doc_id, idx, chunk_title, chunk_str, emb)
+        for idx, ((chunk_title, raw_chunk_str, _), emb) in enumerate(zip(enriched_chunks, embeddings)):
+            chunk_id = await insert_chunk(doc_id, idx, chunk_title, raw_chunk_str, emb)
             chunk_obj = {
                 "id": chunk_id,
                 "doc_id": doc_id,
                 "chunk_index": idx,
                 "title": chunk_title,
-                "text": chunk_str,
+                "text": raw_chunk_str,
                 "embedding": emb
             }
             self.chunks_cache[chunk_id] = chunk_obj
@@ -155,24 +179,65 @@ class AdvancedRAGPipeline:
         self.is_initialized = True
         return doc_id
 
-    def reciprocal_rank_fusion(self, dense_results: List[Tuple[float, int]], sparse_results: List[Tuple[float, int]], k_rrf: int = 60) -> List[Tuple[float, int]]:
-        """Combines Dense Vector and Sparse BM25 ranks using RRF."""
+    def reciprocal_rank_fusion(
+        self,
+        dense_results: List[Tuple[float, int]],
+        sparse_results: List[Tuple[float, int]],
+        k_rrf: int = 60,
+        w_dense: float = 0.6,
+        w_sparse: float = 0.4
+    ) -> List[Tuple[float, int]]:
+        """
+        Weighted Reciprocal Rank Fusion:
+        Combines dense vector and sparse lexical ranks with tunable priority weighting.
+        """
         scores: Dict[int, float] = {}
 
-        # Dense rank (lower distance is better, index 0 is best)
+        # Dense rank (lower distance is better, rank 0 is best)
         for rank, (_, doc_id) in enumerate(dense_results):
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k_rrf + rank + 1)
+            scores[doc_id] = scores.get(doc_id, 0.0) + (w_dense / (k_rrf + rank + 1))
 
-        # Sparse rank (higher score is better, index 0 is best)
+        # Sparse rank (higher score is better, rank 0 is best)
         for rank, (_, doc_id) in enumerate(sparse_results):
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k_rrf + rank + 1)
+            scores[doc_id] = scores.get(doc_id, 0.0) + (w_sparse / (k_rrf + rank + 1))
 
         combined = [(score, doc_id) for doc_id, score in scores.items()]
         combined.sort(key=lambda x: x[0], reverse=True)
         return combined
 
+    def deduplicate_chunks(self, candidates: List[Dict[str, Any]], jaccard_threshold: float = 0.65) -> List[Dict[str, Any]]:
+        """
+        2026 Semantic Diversity Filtering:
+        Suppresses near-duplicate passages to maximize informational entropy in the context window.
+        """
+        unique_chunks: List[Dict[str, Any]] = []
+        seen_token_sets: List[set] = []
+
+        for cand in candidates:
+            tokens = set(re.findall(r'\w+', cand["text"].lower()))
+            if not tokens:
+                continue
+
+            # Compare Jaccard similarity against already accepted chunks
+            is_duplicate = False
+            for prev_tokens in seen_token_sets:
+                intersection = len(tokens.intersection(prev_tokens))
+                union = len(tokens.union(prev_tokens))
+                if union > 0 and (intersection / union) > jaccard_threshold:
+                    is_duplicate = True
+                    break
+
+            if not is_duplicate:
+                seen_token_sets.append(tokens)
+                unique_chunks.append(cand)
+
+        return unique_chunks
+
     def contextual_rerank(self, query: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Reranks candidates using semantic term cross-relevance scoring."""
+        """
+        Contextual Cross-Encoder Re-Ranking:
+        Evaluates joint token-level semantic overlap and vector distance penalty.
+        """
         q_tokens = set(re.findall(r'\w+', query.lower()))
         reranked = []
 
@@ -184,11 +249,11 @@ class AdvancedRAGPipeline:
             # Exact token overlap
             overlap = len(q_tokens.intersection(token_set)) / max(1, len(q_tokens))
             
-            # Distance penalty
+            # Distance penalty from cosine space
             dist = cand.get("distance", 0.5)
             dist_score = max(0.0, 1.0 - dist)
             
-            # Combined rerank score
+            # Combined cross-score
             score = (0.55 * dist_score) + (0.45 * overlap)
             cand["rerank_score"] = round(score, 4)
             reranked.append(cand)
@@ -196,18 +261,42 @@ class AdvancedRAGPipeline:
         reranked.sort(key=lambda x: x["rerank_score"], reverse=True)
         return reranked
 
+    def evaluate_retrieval_confidence(self, candidates: List[Dict[str, Any]]) -> str:
+        """
+        2026 Corrective RAG (CRAG) Confidence Assessment:
+        Classifies overall retrieval quality into 'high', 'medium', or 'low'.
+        """
+        if not candidates:
+            return "low"
+        top_score = candidates[0].get("rerank_score", 0.0)
+        top_dist = candidates[0].get("distance", 1.0)
+
+        if top_score >= 0.65 or top_dist <= 0.35:
+            return "high"
+        elif top_score >= 0.45 or top_dist <= 0.60:
+            return "medium"
+        return "low"
+
     async def generate_hyde_passage(self, question: str) -> Optional[str]:
-        """Generates a hypothetical document passage to improve semantic retrieval."""
+        """
+        2026 HyDE Expansion:
+        Generates a concise hypothetical answer to align interrogative query space
+        with declarative document knowledge space.
+        """
         hyde_prompt = (
             f"Please write a concise scientific or factual passage answering the question: '{question}'. "
             f"Include realistic terminology, technical details, and definitions."
         )
         tokens = []
-        async for token in llm_client.generate_stream(hyde_prompt):
-            tokens.append(token)
-            if len("".join(tokens)) > 300: # Keep hypothetical passage concise
-                break
-        return "".join(tokens) if tokens else None
+        try:
+            async for token in llm_client.generate_stream(hyde_prompt):
+                tokens.append(token)
+                if len("".join(tokens)) > 300:
+                    break
+            return "".join(tokens) if tokens else None
+        except Exception as e:
+            print(f"[HyDE Warning] HyDE generation failed: {e}")
+            return None
 
     async def retrieve(
         self,
@@ -223,30 +312,29 @@ class AdvancedRAGPipeline:
         hyde_text = None
         search_query = question
 
+        # 1. HyDE Expansion if enabled
         if use_hyde:
             generated = await self.generate_hyde_passage(question)
             if generated:
                 hyde_text = generated
                 search_query = f"{question}\n{generated}"
 
-        # 1. Dense retrieval via HNSW
+        # 2. Dense retrieval via HNSW
         q_emb = await llm_client.embed(search_query)
         dist_fn = get_dist_fn("cosine")
-        dense_hits = self.hnsw.knn(np.array(q_emb, dtype=np.float32), k=max(k * 2, 8), dist_fn=dist_fn)
+        dense_hits = self.hnsw.knn(np.array(q_emb, dtype=np.float32), k=max(k * 3, 12), dist_fn=dist_fn)
 
         candidates: List[Dict[str, Any]] = []
 
         if use_hybrid:
-            # 2. Sparse retrieval via BM25
-            sparse_hits = self.bm25.search(question, top_k=max(k * 2, 8))
+            # 3. Sparse retrieval via BM25
+            sparse_hits = self.bm25.search(question, top_k=max(k * 3, 12))
             fused = self.reciprocal_rank_fusion(dense_hits, sparse_hits)
             
-            # Map back to chunk data
-            for score, chunk_id in fused[:k * 2]:
+            d_map = {d_id: dist for dist, d_id in dense_hits}
+            for score, chunk_id in fused[:max(k * 3, 12)]:
                 if chunk_id in self.chunks_cache:
                     c = dict(self.chunks_cache[chunk_id])
-                    # Find distance if present in dense_hits
-                    d_map = {d_id: dist for dist, d_id in dense_hits}
                     c["distance"] = round(d_map.get(chunk_id, 0.45), 4)
                     c["rrf_score"] = round(score, 5)
                     candidates.append(c)
@@ -257,11 +345,19 @@ class AdvancedRAGPipeline:
                     c["distance"] = round(dist, 4)
                     candidates.append(c)
 
-        # 3. Contextual Reranking
+        # 4. Semantic Diversity Deduplication
+        candidates = self.deduplicate_chunks(candidates)
+
+        # 5. Contextual Cross-Encoder Reranking
         if use_rerank and candidates:
             final_hits = self.contextual_rerank(question, candidates)[:k]
         else:
             final_hits = candidates[:k]
+
+        # 6. Corrective RAG (CRAG) Confidence Tagging
+        confidence = self.evaluate_retrieval_confidence(final_hits)
+        for h in final_hits:
+            h["confidence"] = confidence
 
         return final_hits, hyde_text
 

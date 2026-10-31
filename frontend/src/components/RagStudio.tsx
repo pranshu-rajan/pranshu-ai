@@ -43,6 +43,7 @@ export const RagStudio: React.FC = () => {
   const [selectedChunk, setSelectedChunk] = useState<DocumentChunk | null>(null);
   const [hydeText, setHydeText] = useState<string | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
+  const [retrievalConfidence, setRetrievalConfidence] = useState<string | null>(null);
 
   // Knowledge Hub tab
   const [knowledgeTab, setKnowledgeTab] = useState<"docs" | "upload" | "context">("docs");
@@ -127,6 +128,7 @@ export const RagStudio: React.FC = () => {
     setSelectedChunk(null);
     setHydeText(null);
     setLatency(null);
+    setRetrievalConfidence(null);
 
     await askRagStream(
       q,
@@ -135,6 +137,7 @@ export const RagStudio: React.FC = () => {
       (meta) => {
         setActiveContexts(meta.contexts);
         if (meta.hydePassage) setHydeText(meta.hydePassage);
+        if (meta.confidence) setRetrievalConfidence(meta.confidence);
         if (meta.contexts && meta.contexts.length > 0) {
           // Switch tab to context if desired
           setKnowledgeTab("context");
@@ -232,12 +235,29 @@ export const RagStudio: React.FC = () => {
               <Sparkles className="h-4 w-4 text-indigo-600" />
               <h3 className="text-sm font-semibold text-slate-900">Live RAG Knowledge Stream</h3>
             </div>
-            {latency !== null && (
-              <span className="flex items-center gap-1 font-mono text-xs text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60 font-semibold">
-                <Clock className="h-3 w-3" />
-                {latency} ms
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {retrievalConfidence && (
+                <Badge
+                  variant={
+                    retrievalConfidence === "high"
+                      ? "emerald"
+                      : retrievalConfidence === "medium"
+                      ? "amber"
+                      : "slate"
+                  }
+                  size="xs"
+                  dot
+                >
+                  CRAG: {retrievalConfidence.toUpperCase()}
+                </Badge>
+              )}
+              {latency !== null && (
+                <span className="flex items-center gap-1 font-mono text-xs text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60 font-semibold">
+                  <Clock className="h-3 w-3" />
+                  {latency} ms
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Conversation Area */}
@@ -611,14 +631,30 @@ export const RagStudio: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-mono text-xs font-bold text-indigo-600">
+                      <span className="font-mono text-xs font-bold text-indigo-600 truncate max-w-[200px]">
                         Source [{idx + 1}] • {ctx.title}
                       </span>
-                      {ctx.rerank_score && (
-                        <Badge variant="indigo" size="xs">
-                          score: {ctx.rerank_score}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {ctx.confidence && (
+                          <Badge
+                            variant={
+                              ctx.confidence === "high"
+                                ? "emerald"
+                                : ctx.confidence === "medium"
+                                ? "amber"
+                                : "slate"
+                            }
+                            size="xs"
+                          >
+                            {ctx.confidence}
+                          </Badge>
+                        )}
+                        {ctx.rerank_score && (
+                          <Badge variant="indigo" size="xs">
+                            score: {ctx.rerank_score}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
                       {ctx.text}

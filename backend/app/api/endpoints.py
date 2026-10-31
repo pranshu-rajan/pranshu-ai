@@ -167,16 +167,18 @@ async def ask_rag(req: RagQueryRequest):
     for i, c in enumerate(contexts):
         ctx_str += f"[{i + 1}] {c.get('title', 'Document')}:\n{c.get('text', '')}\n\n"
 
+    retrieval_confidence = contexts[0].get("confidence", "medium") if contexts else "low"
+
     system_prompt = (
-        "You are an expert AI knowledge engine with advanced retrieval-augmented generation. "
-        "Answer the user's question directly, accurately, and authoritatively. "
-        "Synthesize facts from the provided context chunks where relevant, maintaining a fluid and natural explanation. "
-        "Cite facts accurately without saying 'According to the context'. "
-        "If the answer is not in the text, use your broad technical knowledge."
+        "You are an expert AI knowledge engine powered by 2026 Advanced Retrieval-Augmented Generation (RAG). "
+        "Answer the user's question directly, accurately, authoritatively, and concisely. "
+        "Synthesize facts seamlessly from the provided numbered context chunks, referencing sources using inline bracket citations like [1] or [2] where relevant. "
+        "Do not use robotic filler like 'According to the context' or 'Based on the provided documents'. "
+        "If the provided context does not contain sufficient information, provide the best factual answer from your broader technical knowledge while clearly noting any unverified aspects."
     )
 
     full_prompt = (
-        f"Context Chunks:\n{ctx_str}\n\n"
+        f"Context Chunks (Retrieval Confidence: {retrieval_confidence.upper()}):\n{ctx_str}\n\n"
         f"User Question: {req.question}\n\n"
         f"Direct Answer:"
     )
@@ -190,6 +192,7 @@ async def ask_rag(req: RagQueryRequest):
                 "type": "meta",
                 "contexts": contexts,
                 "hyde_passage": hyde_passage,
+                "confidence": retrieval_confidence,
                 "model": active_model,
                 "provider": provider
             }
