@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pranshu-ai.vercel.app"),
-  title: "Pranshu's AI — Production Vector Database & Advanced RAG",
+  title: "Pranshu's AI — Vector Database & Advanced RAG Engine",
   description: "High-performance vector database with HNSW, KD-Tree, Groq LLM inference, and Advanced RAG.",
 };
 
@@ -13,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-[#08090d] text-gray-100 antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+    <html lang="en">
+      <body className="min-h-screen bg-[#FAFBFD] text-slate-800 antialiased selection:bg-indigo-500/20 selection:text-indigo-900">
         {children}
       </body>
     </html>

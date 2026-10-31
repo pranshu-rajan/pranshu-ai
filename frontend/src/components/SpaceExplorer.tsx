@@ -4,12 +4,13 @@ import React, { useEffect, useRef, useState } from "react";
 import { PcaPoint } from "../lib/types";
 import { fetchPcaPoints } from "../lib/api";
 import { Compass, ZoomIn, ZoomOut, RotateCcw, Target, Sparkles, Filter } from "lucide-react";
+import Badge from "./ui/Badge";
 
 const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string; glow: string }> = {
-  "Computer Science": { bg: "#06b6d4", border: "#22d3ee", text: "#67e8f9", glow: "rgba(6,182,212,0.4)" },
-  "Mathematics": { bg: "#a855f7", border: "#c084fc", text: "#d8b4fe", glow: "rgba(168,85,247,0.4)" },
-  "Food": { bg: "#f59e0b", border: "#fbbf24", text: "#fde68a", glow: "rgba(245,158,11,0.4)" },
-  "Sports": { bg: "#10b981", border: "#34d399", text: "#a7f3d0", glow: "rgba(16,185,129,0.4)" },
+  "Computer Science": { bg: "#4F46E5", border: "#6366F1", text: "#312E81", glow: "rgba(99, 102, 241, 0.25)" },
+  "Mathematics": { bg: "#8B5CF6", border: "#A78BFA", text: "#4C1D95", glow: "rgba(139, 92, 246, 0.25)" },
+  "Food": { bg: "#D97706", border: "#FBBF24", text: "#78350F", glow: "rgba(217, 119, 6, 0.25)" },
+  "Sports": { bg: "#059669", border: "#34D399", text: "#064E3B", glow: "rgba(5, 150, 105, 0.25)" },
 };
 
 export const SpaceExplorer: React.FC = () => {
@@ -64,9 +65,13 @@ export const SpaceExplorer: React.FC = () => {
 
       ctx.clearRect(0, 0, width, height);
 
+      // Light background fill
+      ctx.fillStyle = "#F8FAFC";
+      ctx.fillRect(0, 0, width, height);
+
       // 1. Draw Radar Grid
       ctx.save();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.strokeStyle = "#E2E8F0";
       ctx.lineWidth = 1;
 
       // Concentric circles
@@ -90,15 +95,15 @@ export const SpaceExplorer: React.FC = () => {
         const sx = centerX + selectedPoint.x * scale;
         const sy = centerY + selectedPoint.y * scale;
 
-        nearestNeighbors.forEach(({ point: nPoint, dist }, idx) => {
+        nearestNeighbors.forEach(({ point: nPoint, dist }) => {
           const nx = centerX + nPoint.x * scale;
           const ny = centerY + nPoint.y * scale;
 
           ctx.save();
-          // Glowing gradient beam
+          // Soft modern gradient beam
           const grad = ctx.createLinearGradient(sx, sy, nx, ny);
-          grad.addColorStop(0, "rgba(6, 182, 212, 0.8)");
-          grad.addColorStop(1, "rgba(168, 85, 247, 0.2)");
+          grad.addColorStop(0, "rgba(79, 70, 229, 0.75)");
+          grad.addColorStop(1, "rgba(139, 92, 246, 0.3)");
           ctx.strokeStyle = grad;
           ctx.lineWidth = 2;
           ctx.setLineDash([4, 4]);
@@ -107,19 +112,27 @@ export const SpaceExplorer: React.FC = () => {
           ctx.lineTo(nx, ny);
           ctx.stroke();
 
-          // Draw distance tag
+          // Draw distance tag pill
           const midX = (sx + nx) / 2;
           const midY = (sy + ny) / 2;
-          ctx.fillStyle = "#08090d";
-          ctx.strokeStyle = "rgba(6, 182, 212, 0.4)";
+          ctx.fillStyle = "#FFFFFF";
+          ctx.shadowColor = "rgba(0, 0, 0, 0.08)";
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetY = 2;
+          ctx.beginPath();
+          ctx.roundRect ? ctx.roundRect(midX - 24, midY - 10, 48, 20, 10) : ctx.rect(midX - 24, midY - 10, 48, 20);
+          ctx.fill();
+
+          ctx.shadowColor = "transparent";
+          ctx.strokeStyle = "#CBD5E1";
           ctx.lineWidth = 1;
-          ctx.fillRect(midX - 22, midY - 10, 44, 18);
-          ctx.strokeRect(midX - 22, midY - 10, 44, 18);
-          ctx.fillStyle = "#67e8f9";
-          ctx.font = "10px monospace";
+          ctx.stroke();
+
+          ctx.fillStyle = "#4F46E5";
+          ctx.font = "bold 10px monospace";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(`d=${dist}`, midX, midY);
+          ctx.fillText(`d=${dist}`, midX, midY + 1);
           ctx.restore();
         });
       }
@@ -136,28 +149,38 @@ export const SpaceExplorer: React.FC = () => {
         const style = CATEGORY_COLORS[p.category] || CATEGORY_COLORS["Computer Science"];
 
         ctx.save();
-        // Glow effect
+
+        // Shadow / halo
         if (isSelected || isNeighbor || isHovered) {
-          ctx.shadowColor = isSelected ? "#06b6d4" : style.border;
-          ctx.shadowBlur = isSelected ? 20 : 12;
+          ctx.shadowColor = isSelected ? "rgba(79, 70, 229, 0.4)" : "rgba(0, 0, 0, 0.15)";
+          ctx.shadowBlur = isSelected ? 16 : 8;
+          ctx.shadowOffsetY = isSelected ? 4 : 2;
         }
 
         ctx.beginPath();
         const radius = isSelected ? 9 : isHovered ? 8 : isNeighbor ? 7 : 5.5;
         ctx.arc(px, py, radius, 0, Math.PI * 2);
-        ctx.fillStyle = isSelected ? "#ffffff" : style.bg;
+        ctx.fillStyle = isSelected ? "#4F46E5" : style.bg;
         ctx.fill();
-        ctx.lineWidth = isSelected ? 3 : 1.5;
-        ctx.strokeStyle = isSelected ? "#06b6d4" : style.border;
+
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.strokeStyle = "#FFFFFF";
         ctx.stroke();
 
         // Label on hover or selected
         if (isSelected || isHovered || isNeighbor) {
           ctx.shadowBlur = 0;
-          ctx.fillStyle = isSelected ? "#ffffff" : style.text;
-          ctx.font = isSelected ? "bold 11px sans-serif" : "10px sans-serif";
+          ctx.fillStyle = isSelected ? "#0F172A" : "#334155";
+          ctx.font = isSelected ? "bold 11px sans-serif" : "500 10px sans-serif";
           ctx.textAlign = "left";
-          ctx.fillText(p.metadata, px + 12, py + 4);
+
+          // Text background for legibility
+          const textMetrics = ctx.measureText(p.metadata);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+          ctx.fillRect(px + 12, py - 9, textMetrics.width + 8, 18);
+
+          ctx.fillStyle = isSelected ? "#4F46E5" : "#1E293B";
+          ctx.fillText(p.metadata, px + 16, py + 4);
         }
 
         ctx.restore();
@@ -173,7 +196,7 @@ export const SpaceExplorer: React.FC = () => {
   // Handle canvas mouse interactions
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - dragStart.y });
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -212,7 +235,7 @@ export const SpaceExplorer: React.FC = () => {
 
   const handleMouseUp = () => setIsDragging(false);
 
-  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleClick = () => {
     if (hoveredPoint) {
       setSelectedPoint(hoveredPoint);
     }
@@ -223,26 +246,26 @@ export const SpaceExplorer: React.FC = () => {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       {/* 2D Space Canvas */}
-      <div className="glass-panel relative flex flex-col overflow-hidden rounded-2xl lg:col-span-2">
+      <div className="surface-card relative flex flex-col overflow-hidden lg:col-span-2">
         {/* Radar Controls Header */}
-        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-4 py-3 bg-[#0d0f16]/60">
+        <div className="flex flex-wrap items-center justify-between border-b border-slate-100 px-4 py-3 bg-white">
           <div className="flex items-center gap-2">
-            <Compass className="h-4 w-4 text-cyan-400" />
-            <span className="text-sm font-semibold text-white">2D Semantic Space (PCA Projection)</span>
-            <span className="text-xs text-gray-400">({points.length} vectors)</span>
+            <Compass className="h-4 w-4 text-indigo-600" />
+            <span className="text-sm font-semibold text-slate-800">2D Semantic Space (PCA Projection)</span>
+            <span className="text-xs text-slate-500">({points.length} vectors)</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setZoom((z) => Math.min(z + 0.2, 2.5))}
-              className="rounded-lg border border-white/10 p-1.5 text-gray-400 hover:bg-white/5 hover:text-white"
+              className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
               title="Zoom In"
             >
               <ZoomIn className="h-4 w-4" />
             </button>
             <button
               onClick={() => setZoom((z) => Math.max(z - 0.2, 0.6))}
-              className="rounded-lg border border-white/10 p-1.5 text-gray-400 hover:bg-white/5 hover:text-white"
+              className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
               title="Zoom Out"
             >
               <ZoomOut className="h-4 w-4" />
@@ -252,7 +275,7 @@ export const SpaceExplorer: React.FC = () => {
                 setZoom(1.0);
                 setPan({ x: 0, y: 0 });
               }}
-              className="rounded-lg border border-white/10 p-1.5 text-gray-400 hover:bg-white/5 hover:text-white"
+              className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
               title="Reset View"
             >
               <RotateCcw className="h-4 w-4" />
@@ -261,25 +284,31 @@ export const SpaceExplorer: React.FC = () => {
         </div>
 
         {/* Category Filters */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-4 py-2 text-xs">
-          <Filter className="h-3.5 w-3.5 text-gray-400" />
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`rounded-full px-2.5 py-0.5 transition ${
-                selectedCategory === cat
-                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-medium"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 text-slate-500 mr-1">
+            <Filter className="h-3.5 w-3.5" />
+            <span className="font-medium text-[11px]">Filter:</span>
+          </div>
+          {categories.map((cat) => {
+            const isSelected = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`rounded-full px-3 py-1 transition font-medium text-xs ${
+                  isSelected
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
         </div>
 
         {/* Canvas Area */}
-        <div className="relative h-[480px] w-full bg-cyber-grid bg-[#08090d]">
+        <div className="relative h-[480px] w-full bg-[#F8FAFC]">
           <canvas
             ref={canvasRef}
             width={800}
@@ -290,26 +319,26 @@ export const SpaceExplorer: React.FC = () => {
             onMouseUp={handleMouseUp}
             onClick={handleClick}
           />
-          <div className="pointer-events-none absolute bottom-3 left-3 text-[11px] text-gray-500">
-            Drag to pan • Scroll / buttons to zoom • Click a vector to cast search beam
+          <div className="pointer-events-none absolute bottom-3 left-3 text-[11px] text-slate-400 bg-white/80 backdrop-blur-xs px-2.5 py-1 rounded-md border border-slate-200/60">
+            Drag to pan • Zoom with buttons • Click any point to cast search beam
           </div>
         </div>
       </div>
 
       {/* Selected Vector & Nearest Neighbor Inspector */}
-      <div className="flex flex-col gap-6">
-        <div className="glass-panel rounded-2xl p-5">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+      <div className="flex flex-col gap-5">
+        <div className="surface-card p-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-cyan-400" />
-              <h3 className="text-sm font-semibold text-white">Target Vector</h3>
+              <Target className="h-4 w-4 text-indigo-600" />
+              <h3 className="text-sm font-semibold text-slate-900">Target Vector</h3>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">Top-K:</span>
+              <span className="text-xs text-slate-500 font-medium">Top-K:</span>
               <select
                 value={kNearest}
                 onChange={(e) => setKNearest(Number(e.target.value))}
-                className="rounded-lg border border-white/10 bg-[#12141c] px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-cyan-500"
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-indigo-500 shadow-xs"
               >
                 <option value={2}>2</option>
                 <option value={3}>3</option>
@@ -321,68 +350,68 @@ export const SpaceExplorer: React.FC = () => {
           {selectedPoint ? (
             <div className="mt-4 space-y-4">
               <div>
-                <span className="text-xs text-gray-400">Label</span>
-                <p className="font-semibold text-white">{selectedPoint.metadata}</p>
+                <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Label</span>
+                <p className="text-base font-semibold text-slate-900 mt-0.5">{selectedPoint.metadata}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl border border-white/5 bg-[#12141c] p-2.5">
-                  <span className="text-gray-400">Category</span>
-                  <p className="mt-0.5 font-medium text-cyan-300">{selectedPoint.category}</p>
+              <div className="grid grid-cols-2 gap-2.5 text-xs">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                  <span className="text-slate-500 text-[11px]">Category</span>
+                  <p className="mt-0.5 font-semibold text-indigo-700">{selectedPoint.category}</p>
                 </div>
-                <div className="rounded-xl border border-white/5 bg-[#12141c] p-2.5">
-                  <span className="text-gray-400">PCA Coordinates</span>
-                  <p className="mt-0.5 font-mono text-gray-300">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                  <span className="text-slate-500 text-[11px]">PCA Coordinates</span>
+                  <p className="mt-0.5 font-mono text-slate-700 font-medium">
                     ({selectedPoint.x}, {selectedPoint.y})
                   </p>
                 </div>
               </div>
 
               {/* Nearest Neighbors List */}
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-300">
+              <div className="pt-2">
+                <div className="mb-2.5 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-800">
                     Nearest Neighbors in Space:
                   </span>
-                  <span className="text-[10px] text-cyan-400">HNSW / Cosine</span>
+                  <Badge variant="indigo" size="xs">HNSW Cosine</Badge>
                 </div>
                 <div className="space-y-2">
                   {nearestNeighbors.map(({ point: np, dist }, idx) => (
                     <div
                       key={np.id}
                       onClick={() => setSelectedPoint(np)}
-                      className="group flex cursor-pointer items-center justify-between rounded-xl border border-white/5 bg-[#12141c] p-2.5 transition hover:border-cyan-500/40 hover:bg-cyan-500/5"
+                      className="group flex cursor-pointer items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 transition hover:border-indigo-200 hover:bg-indigo-50/50"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/5 text-[10px] font-mono text-gray-400 group-hover:text-cyan-300">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-slate-200 text-[10px] font-mono text-slate-600 font-bold group-hover:border-indigo-300 group-hover:text-indigo-700">
                           #{idx + 1}
                         </span>
-                        <div>
-                          <p className="text-xs font-medium text-gray-200 group-hover:text-white">
+                        <div className="min-w-0 truncate">
+                          <p className="text-xs font-semibold text-slate-800 truncate group-hover:text-indigo-900">
                             {np.metadata}
                           </p>
-                          <span className="text-[10px] text-gray-400">{np.category}</span>
+                          <span className="text-[10px] text-slate-500">{np.category}</span>
                         </div>
                       </div>
-                      <span className="font-mono text-xs text-cyan-400">d={dist}</span>
+                      <span className="font-mono text-xs font-semibold text-indigo-600 shrink-0 ml-2">d={dist}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
           ) : (
-            <p className="mt-4 text-xs text-gray-500">Click any point on the radar to inspect.</p>
+            <p className="mt-4 text-xs text-slate-400">Click any point on the radar to inspect.</p>
           )}
         </div>
 
         {/* Algorithm Insight Card */}
-        <div className="glass-panel rounded-2xl p-5 bg-gradient-to-br from-[#0d0f16] to-[#121626]">
-          <div className="flex items-center gap-2 text-cyan-400">
+        <div className="surface-card p-5 bg-gradient-to-br from-indigo-50/50 via-white to-violet-50/30 border-indigo-100/70">
+          <div className="flex items-center gap-2 text-indigo-700 mb-2">
             <Sparkles className="h-4 w-4" />
-            <h4 className="text-xs font-semibold uppercase tracking-wider">Dimensionality Reduction</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider">Dimensionality Reduction</h4>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-gray-400">
-            The original vectors live in a <strong className="text-gray-200">16-dimensional</strong> semantic space. Principal Component Analysis (PCA) projects these hyper-dimensional clusters onto a 2D plane while preserving the maximum variance of cosine angles.
+          <p className="text-xs leading-relaxed text-slate-600">
+            The original vectors live in a <strong className="text-slate-900 font-semibold">16-dimensional</strong> semantic space. Principal Component Analysis (PCA) projects these hyper-dimensional clusters onto a 2D plane while preserving the maximum variance of cosine angles.
           </p>
         </div>
       </div>

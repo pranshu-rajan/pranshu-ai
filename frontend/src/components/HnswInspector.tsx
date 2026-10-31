@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { HnswGraphData, HnswNode, HnswEdge } from "../lib/types";
+import { HnswGraphData } from "../lib/types";
 import { fetchHnswInfo } from "../lib/api";
-import { Layers, Play, RefreshCw, Network, Zap, Info } from "lucide-react";
+import { Network, Play, Zap, Info, ArrowDownRight } from "lucide-react";
+import Button from "./ui/Button";
+import Badge from "./ui/Badge";
 
 export const HnswInspector: React.FC = () => {
   const [data, setData] = useState<HnswGraphData | null>(null);
@@ -112,7 +114,12 @@ export const HnswInspector: React.FC = () => {
   };
 
   if (!data) {
-    return <div className="glass-panel p-8 text-center text-gray-400">Loading HNSW topology...</div>;
+    return (
+      <div className="surface-card p-12 text-center text-slate-500">
+        <div className="w-8 h-8 mx-auto mb-3 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin" />
+        <p className="text-sm font-medium">Loading HNSW topology...</p>
+      </div>
+    );
   }
 
   const layersCount = data.topLayer + 1;
@@ -120,33 +127,29 @@ export const HnswInspector: React.FC = () => {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       {/* Graph Visualizer Canvas */}
-      <div className="glass-panel relative flex flex-col overflow-hidden rounded-2xl lg:col-span-2">
+      <div className="surface-card relative flex flex-col overflow-hidden lg:col-span-2">
         {/* Header Controls */}
-        <div className="flex flex-wrap items-center justify-between border-b border-white/10 px-5 py-3 bg-[#0d0f16]/60">
+        <div className="flex flex-wrap items-center justify-between border-b border-slate-100 px-5 py-3.5 bg-white">
           <div className="flex items-center gap-2">
-            <Network className="h-4 w-4 text-cyan-400" />
-            <h3 className="text-sm font-semibold text-white">Hierarchical Multilayer Graph</h3>
+            <Network className="h-4 w-4 text-indigo-600" />
+            <h3 className="text-sm font-semibold text-slate-900">Hierarchical Proximity Graph</h3>
+            <span className="text-xs text-slate-400 font-medium">({layerNodes.length} nodes active)</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={runSimulation}
-              disabled={isSimulating}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium transition ${
-                isSimulating
-                  ? "bg-cyan-500/10 text-cyan-400 opacity-50 cursor-not-allowed"
-                  : "bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40"
-              }`}
-            >
-              <Play className="h-3.5 w-3.5" />
-              <span>{isSimulating ? "Traversing..." : "Simulate Search Hop"}</span>
-            </button>
-          </div>
+          <Button
+            size="sm"
+            variant="subtle"
+            onClick={runSimulation}
+            disabled={isSimulating}
+            icon={<Play className="h-3.5 w-3.5" />}
+          >
+            {isSimulating ? "Traversing..." : "Simulate Search Hop"}
+          </Button>
         </div>
 
         {/* Layer Selector Tabs */}
-        <div className="flex items-center gap-2 border-b border-white/5 bg-[#090a0f] px-5 py-2.5">
-          <span className="text-xs text-gray-400 mr-2">Layer Hierarchy:</span>
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-5 py-2.5">
+          <span className="text-xs text-slate-500 font-medium mr-1">Layer Level:</span>
           {Array.from({ length: layersCount }).map((_, lyr) => {
             const nodeCount = data.nodesPerLayer[lyr] || 0;
             const edgeCount = data.edgesPerLayer[lyr] || 0;
@@ -160,15 +163,19 @@ export const HnswInspector: React.FC = () => {
                   setHighlightedEdges([]);
                   setSimulationLog([]);
                 }}
-                className={`flex items-center gap-2 rounded-lg px-3 py-1 text-xs transition ${
+                className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs transition font-medium ${
                   isActive
-                    ? "border border-cyan-500/40 bg-cyan-500/20 text-cyan-300 font-semibold shadow-sm"
-                    : "border border-white/5 bg-white/5 text-gray-400 hover:text-white"
+                    ? "bg-white text-indigo-700 shadow-sm border border-indigo-200/80 font-semibold"
+                    : "bg-transparent text-slate-600 hover:bg-slate-200/50"
                 }`}
               >
                 <span>Layer {lyr}</span>
-                <span className="rounded bg-black/40 px-1.5 py-0.2 text-[10px] text-gray-300">
-                  {nodeCount} nodes • {edgeCount} edges
+                <span
+                  className={`rounded-md px-1.5 py-0.5 text-[10px] font-mono ${
+                    isActive ? "bg-indigo-50 text-indigo-600" : "bg-slate-200/60 text-slate-500"
+                  }`}
+                >
+                  {nodeCount}n • {edgeCount}e
                 </span>
               </button>
             );
@@ -176,7 +183,7 @@ export const HnswInspector: React.FC = () => {
         </div>
 
         {/* SVG Graph View */}
-        <div className="relative h-[480px] w-full bg-cyber-grid bg-[#08090d]">
+        <div className="relative h-[480px] w-full bg-[#FAFBFD]">
           <svg className="h-full w-full" viewBox="0 0 700 460">
             {/* Edges */}
             {layerEdges.map((e, idx) => {
@@ -196,8 +203,8 @@ export const HnswInspector: React.FC = () => {
                   y1={srcPos.y}
                   x2={dstPos.x}
                   y2={dstPos.y}
-                  stroke={isEdgeHighlighted ? "#06b6d4" : "rgba(255, 255, 255, 0.12)"}
-                  strokeWidth={isEdgeHighlighted ? 3 : 1.2}
+                  stroke={isEdgeHighlighted ? "#6366F1" : "#E2E8F0"}
+                  strokeWidth={isEdgeHighlighted ? 2.5 : 1.2}
                   strokeDasharray={isEdgeHighlighted ? "4,4" : undefined}
                 />
               );
@@ -217,26 +224,28 @@ export const HnswInspector: React.FC = () => {
                     <circle
                       cx={pos.x}
                       cy={pos.y}
-                      r={20}
+                      r={22}
                       fill="none"
-                      stroke="#06b6d4"
+                      stroke="#6366F1"
                       strokeWidth={2}
-                      className="animate-ping opacity-75"
+                      className="animate-ping opacity-60"
                     />
                   )}
                   <circle
                     cx={pos.x}
                     cy={pos.y}
                     r={isNodeHighlighted ? 12 : 9}
-                    fill={isNodeHighlighted ? "#06b6d4" : isTopLayerNode ? "#8b5cf6" : "#1e293b"}
-                    stroke={isNodeHighlighted ? "#ffffff" : isTopLayerNode ? "#a855f7" : "#475569"}
-                    strokeWidth={2}
+                    fill={isNodeHighlighted ? "#6366F1" : isTopLayerNode ? "#8B5CF6" : "#475569"}
+                    stroke="#FFFFFF"
+                    strokeWidth={2.5}
+                    className="shadow-sm"
                   />
                   <text
                     x={pos.x}
                     y={pos.y - 14}
-                    fill={isNodeHighlighted ? "#67e8f9" : "#94a3b8"}
+                    fill={isNodeHighlighted ? "#4338CA" : "#475569"}
                     fontSize="11"
+                    fontWeight={isNodeHighlighted ? "bold" : "500"}
                     fontFamily="sans-serif"
                     textAnchor="middle"
                   >
@@ -245,8 +254,9 @@ export const HnswInspector: React.FC = () => {
                   <text
                     x={pos.x}
                     y={pos.y + 3}
-                    fill="#ffffff"
+                    fill="#FFFFFF"
                     fontSize="8"
+                    fontWeight="bold"
                     fontFamily="monospace"
                     textAnchor="middle"
                   >
@@ -256,7 +266,7 @@ export const HnswInspector: React.FC = () => {
               );
             })}
           </svg>
-          <div className="pointer-events-none absolute bottom-3 left-4 text-[11px] text-gray-500">
+          <div className="pointer-events-none absolute bottom-3 left-4 text-[11px] text-slate-500 bg-white/80 backdrop-blur-xs px-2.5 py-1 rounded-md border border-slate-200/60">
             {activeLayer === 0
               ? "Layer 0: Dense local neighborhood network with highest recall."
               : `Layer ${activeLayer}: Sparse expressway network with long-distance skip connections.`}
@@ -265,23 +275,34 @@ export const HnswInspector: React.FC = () => {
       </div>
 
       {/* Traversal Log & HNSW Theory */}
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
         {/* Traversal Console */}
-        <div className="glass-panel flex flex-col rounded-2xl p-5">
-          <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-            <Zap className="h-4 w-4 text-cyan-400" />
-            <h4 className="text-sm font-semibold text-white">Search Traversal Telemetry</h4>
+        <div className="surface-card flex flex-col p-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-indigo-600" />
+              <h4 className="text-sm font-semibold text-slate-900">Search Traversal Telemetry</h4>
+            </div>
+            {isSimulating && (
+              <Badge variant="indigo" size="xs" dot>Live Routing</Badge>
+            )}
           </div>
 
           <div className="mt-3 flex-1 overflow-y-auto space-y-2 min-h-[160px] max-h-[220px]">
             {simulationLog.length === 0 ? (
-              <p className="text-xs text-gray-500 italic">
-                Click &quot;Simulate Search Hop&quot; to inspect real-time greedy navigation through HNSW layers.
-              </p>
+              <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
+                <ArrowDownRight className="w-6 h-6 mb-2 text-slate-300" />
+                <p className="text-xs">
+                  Click &quot;Simulate Search Hop&quot; to inspect real-time greedy navigation through HNSW layers.
+                </p>
+              </div>
             ) : (
               simulationLog.map((log, i) => (
-                <div key={i} className="rounded-lg border border-white/5 bg-[#12141c] p-2 text-xs font-mono text-cyan-300">
-                  <span className="text-gray-500 mr-1.5">&gt;</span>
+                <div
+                  key={i}
+                  className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-2.5 text-xs font-mono text-indigo-900 leading-relaxed shadow-xs"
+                >
+                  <span className="text-indigo-400 font-bold mr-1.5">&gt;</span>
                   {log}
                 </div>
               ))
@@ -290,24 +311,24 @@ export const HnswInspector: React.FC = () => {
         </div>
 
         {/* HNSW Skip-List Concept Card */}
-        <div className="glass-panel rounded-2xl p-5">
-          <div className="flex items-center gap-2 text-purple-400 mb-2">
+        <div className="surface-card p-5 bg-gradient-to-br from-purple-50/40 via-white to-indigo-50/40 border-purple-100/70">
+          <div className="flex items-center gap-2 text-purple-700 mb-2">
             <Info className="h-4 w-4" />
-            <h4 className="text-xs font-semibold uppercase tracking-wider">How HNSW Beats Brute Force</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider">How HNSW Beats Brute Force</h4>
           </div>
-          <p className="text-xs leading-relaxed text-gray-400">
-            HNSW extends the 1D <em>Skip-List</em> data structure to multi-dimensional metric spaces.
-            Upper layers contain exponentially fewer nodes, serving as long-range &quot;expressways&quot;. Search starts at the top entry point, navigates greedily to the local nearest neighbor, then descends to lower layers for precise convergence in <strong className="text-cyan-300 font-mono">O(log N)</strong> time.
+          <p className="text-xs leading-relaxed text-slate-600">
+            HNSW extends the 1D <strong className="text-slate-800">Skip-List</strong> data structure to multi-dimensional metric spaces.
+            Upper layers contain exponentially fewer nodes, serving as long-range &quot;expressways&quot;. Search starts at the top entry point, navigates greedily to the local nearest neighbor, then descends to lower layers for precise convergence in <strong className="text-indigo-600 font-mono font-semibold">O(log N)</strong> time.
           </p>
 
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-lg bg-white/5 p-2">
-              <span className="text-gray-500">M Parameter</span>
-              <p className="font-semibold text-white">16 neighbors</p>
+          <div className="mt-4 grid grid-cols-2 gap-2.5 text-xs">
+            <div className="rounded-xl bg-white border border-slate-200/80 p-2.5 shadow-xs">
+              <span className="text-slate-400 text-[11px] font-medium">M Parameter</span>
+              <p className="font-semibold text-slate-800 mt-0.5">16 neighbors</p>
             </div>
-            <div className="rounded-lg bg-white/5 p-2">
-              <span className="text-gray-500">efConstruction</span>
-              <p className="font-semibold text-white">64 candidates</p>
+            <div className="rounded-lg bg-white border border-slate-200/80 p-2.5 shadow-xs">
+              <span className="text-slate-400 text-[11px] font-medium">efConstruction</span>
+              <p className="font-semibold text-slate-800 mt-0.5">64 candidates</p>
             </div>
           </div>
         </div>
