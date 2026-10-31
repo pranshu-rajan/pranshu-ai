@@ -6,7 +6,11 @@ import {
 export function getApiBase(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   if (envUrl && envUrl.trim() !== "") {
-    return envUrl.trim().replace(/\/+$/, "");
+    let clean = envUrl.trim().replace(/\/+$/, "");
+    if (clean.endsWith("/api")) {
+      clean = clean.slice(0, -4);
+    }
+    return clean;
   }
   return "";
 }

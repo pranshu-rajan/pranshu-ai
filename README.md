@@ -164,8 +164,7 @@ npm run dev
 │   ├── tailwind.config.ts    # 2026 Dark Obsidian & Cyber Neon theme
 │   ├── tsconfig.json         # TypeScript configuration
 │   └── Dockerfile            # Next.js production container
-├── docker-compose.yml        # 1-Click full-stack containerization
-└── .github/workflows/ci.yml  # GitHub Actions CI for C++, Python, Next.js
+└── docker-compose.yml        # 1-Click full-stack containerization
 ```
 
 ---

@@ -19,7 +19,7 @@ def is_postgres() -> bool:
 def _get_pg_connection():
     import psycopg2
     from psycopg2.extras import RealDictCursor
-    raw_url = settings.DATABASE_URL.strip()
+    raw_url = (settings.DATABASE_URL or "").strip()
     if raw_url.startswith("postgres://"):
         raw_url = "postgresql://" + raw_url[len("postgres://"):]
     
@@ -29,6 +29,11 @@ def _get_pg_connection():
         prefix, user, password, host_part = m.groups()
         encoded_pass = urllib.parse.quote_plus(urllib.parse.unquote_plus(password))
         raw_url = f"{prefix}{user}:{encoded_pass}@{host_part}"
+
+    # Supabase AWS pooler requires SSL. Append sslmode=require if not present
+    if "sslmode=" not in raw_url:
+        separator = "&" if "?" in raw_url else "?"
+        raw_url = f"{raw_url}{separator}sslmode=require"
 
     return psycopg2.connect(raw_url, cursor_factory=RealDictCursor, connect_timeout=5)
 
@@ -41,8 +46,48 @@ def _get_sqlite_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def _init_sqlite_tables():
+    with _get_sqlite_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                tags TEXT DEFAULT 'general',
+                raw_text TEXT NOT NULL,
+                chunk_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                doc_id INTEGER NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                text TEXT NOT NULL,
+                embedding TEXT NOT NULL,
+                FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                contexts TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+
 def _sync_init_db():
     global _USE_POSTGRES
+    # 1. Always ensure local SQLite tables exist so the app NEVER crashes on fallback
+    _init_sqlite_tables()
+
+    # 2. Try connecting and initializing PostgreSQL if DATABASE_URL is configured
     if is_postgres():
         try:
             with _get_pg_connection() as conn:
@@ -79,216 +124,217 @@ def _sync_init_db():
                     """)
                 conn.commit()
             _USE_POSTGRES = True
-            print("✅ Successfully connected to Supabase PostgreSQL!")
+            print("[Database] Successfully connected to Supabase PostgreSQL!")
             return
         except Exception as e:
-            print(f"⚠️ Supabase PostgreSQL connection error: {e}")
-            print("⚠️ Falling back to local SQLite so server can boot and remain online.")
+            print(f"[Database Warning] Supabase PostgreSQL connection error: {e}")
+            print("[Database Resilient Fallback] Operating on local SQLite storage so server stays online.")
             _USE_POSTGRES = False
-    else:
-        with _get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS documents (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    tags TEXT DEFAULT 'general',
-                    raw_text TEXT NOT NULL,
-                    chunk_count INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS chunks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    doc_id INTEGER NOT NULL,
-                    chunk_index INTEGER NOT NULL,
-                    title TEXT NOT NULL,
-                    text TEXT NOT NULL,
-                    embedding TEXT NOT NULL,
-                    FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
-                )
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS chat_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    question TEXT NOT NULL,
-                    answer TEXT NOT NULL,
-                    provider TEXT NOT NULL,
-                    contexts TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            conn.commit()
 
 async def init_db():
     await asyncio.to_thread(_sync_init_db)
 
 def _sync_insert_document(title: str, text: str, tags: str) -> int:
+    global _USE_POSTGRES
     if is_postgres():
-        with _get_pg_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO documents (title, raw_text, tags) VALUES (%s, %s, %s) RETURNING id;",
-                    (title, text, tags)
-                )
-                row = cursor.fetchone()
-                conn.commit()
-                return int(row["id"])
-    else:
-        with _get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO documents (title, raw_text, tags) VALUES (?, ?, ?)",
-                (title, text, tags)
-            )
-            conn.commit()
-            return cursor.lastrowid
+        try:
+            with _get_pg_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO documents (title, raw_text, tags) VALUES (%s, %s, %s) RETURNING id;",
+                        (title, text, tags)
+                    )
+                    row = cursor.fetchone()
+                    conn.commit()
+                    return int(row["id"])
+        except Exception as e:
+            print(f"[Database Error] Postgres insert_document failed: {e}. Falling back to SQLite.")
+            _USE_POSTGRES = False
+
+    with _get_sqlite_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO documents (title, raw_text, tags) VALUES (?, ?, ?)",
+            (title, text, tags)
+        )
+        conn.commit()
+        return cursor.lastrowid
 
 async def insert_document(title: str, text: str, tags: str = "general") -> int:
     return await asyncio.to_thread(_sync_insert_document, title, text, tags)
 
 def _sync_insert_chunk(doc_id: int, chunk_index: int, title: str, text: str, embedding: List[float]) -> int:
+    global _USE_POSTGRES
     emb_json = json.dumps(embedding)
     if is_postgres():
-        with _get_pg_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO chunks (doc_id, chunk_index, title, text, embedding) VALUES (%s, %s, %s, %s, %s) RETURNING id;",
-                    (doc_id, chunk_index, title, text, emb_json)
-                )
-                row = cursor.fetchone()
-                cursor.execute(
-                    "UPDATE documents SET chunk_count = chunk_count + 1 WHERE id = %s;",
-                    (doc_id,)
-                )
-                conn.commit()
-                return int(row["id"])
-    else:
-        with _get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO chunks (doc_id, chunk_index, title, text, embedding) VALUES (?, ?, ?, ?, ?)",
-                (doc_id, chunk_index, title, text, emb_json)
-            )
-            cursor.execute(
-                "UPDATE documents SET chunk_count = chunk_count + 1 WHERE id = ?",
-                (doc_id,)
-            )
-            conn.commit()
-            return cursor.lastrowid
+        try:
+            with _get_pg_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO chunks (doc_id, chunk_index, title, text, embedding) VALUES (%s, %s, %s, %s, %s) RETURNING id;",
+                        (doc_id, chunk_index, title, text, emb_json)
+                    )
+                    row = cursor.fetchone()
+                    cursor.execute(
+                        "UPDATE documents SET chunk_count = chunk_count + 1 WHERE id = %s;",
+                        (doc_id,)
+                    )
+                    conn.commit()
+                    return int(row["id"])
+        except Exception as e:
+            print(f"[Database Error] Postgres insert_chunk failed: {e}. Falling back to SQLite.")
+            _USE_POSTGRES = False
+
+    with _get_sqlite_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO chunks (doc_id, chunk_index, title, text, embedding) VALUES (?, ?, ?, ?, ?)",
+            (doc_id, chunk_index, title, text, emb_json)
+        )
+        cursor.execute(
+            "UPDATE documents SET chunk_count = chunk_count + 1 WHERE id = ?",
+            (doc_id,)
+        )
+        conn.commit()
+        return cursor.lastrowid
 
 async def insert_chunk(doc_id: int, chunk_index: int, title: str, text: str, embedding: List[float]) -> int:
     return await asyncio.to_thread(_sync_insert_chunk, doc_id, chunk_index, title, text, embedding)
 
 def _sync_get_all_documents() -> List[Dict[str, Any]]:
+    global _USE_POSTGRES
     if is_postgres():
-        with _get_pg_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT id, title, SUBSTRING(raw_text FROM 1 FOR 120) as preview, chunk_count, created_at FROM documents ORDER BY id DESC;"
-                )
-                rows = cursor.fetchall()
-                out = []
-                for r in rows:
-                    d = dict(r)
-                    if d.get("created_at"):
-                        d["created_at"] = str(d["created_at"])
-                    out.append(d)
-                return out
-    else:
-        with _get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, title, substr(raw_text, 1, 120) as preview, chunk_count, created_at FROM documents ORDER BY id DESC"
-            )
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+        try:
+            with _get_pg_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT id, title, SUBSTRING(raw_text FROM 1 FOR 120) as preview, chunk_count, created_at FROM documents ORDER BY id DESC;"
+                    )
+                    rows = cursor.fetchall()
+                    out = []
+                    for r in rows:
+                        d = dict(r)
+                        if d.get("created_at"):
+                            d["created_at"] = str(d["created_at"])
+                        out.append(d)
+                    return out
+        except Exception as e:
+            print(f"[Database Error] Postgres get_all_documents failed: {e}. Falling back to SQLite.")
+            _USE_POSTGRES = False
+
+    with _get_sqlite_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, title, substr(raw_text, 1, 120) as preview, chunk_count, created_at FROM documents ORDER BY id DESC"
+        )
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
 
 async def get_all_documents() -> List[Dict[str, Any]]:
     return await asyncio.to_thread(_sync_get_all_documents)
 
 def _sync_get_all_chunks() -> List[Dict[str, Any]]:
+    global _USE_POSTGRES
     if is_postgres():
-        with _get_pg_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT id, doc_id, chunk_index, title, text, embedding FROM chunks;")
-                rows = cursor.fetchall()
-                result = []
-                for r in rows:
-                    d = dict(r)
-                    d["embedding"] = json.loads(d["embedding"]) if isinstance(d["embedding"], str) else d["embedding"]
-                    result.append(d)
-                return result
-    else:
-        with _get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, doc_id, chunk_index, title, text, embedding FROM chunks")
-            rows = cursor.fetchall()
-            result = []
-            for r in rows:
-                d = dict(r)
-                d["embedding"] = json.loads(d["embedding"])
-                result.append(d)
-            return result
+        try:
+            with _get_pg_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT id, doc_id, chunk_index, title, text, embedding FROM chunks;")
+                    rows = cursor.fetchall()
+                    result = []
+                    for r in rows:
+                        d = dict(r)
+                        d["embedding"] = json.loads(d["embedding"]) if isinstance(d["embedding"], str) else d["embedding"]
+                        result.append(d)
+                    return result
+        except Exception as e:
+            print(f"[Database Error] Postgres get_all_chunks failed: {e}. Falling back to SQLite.")
+            _USE_POSTGRES = False
+
+    with _get_sqlite_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, doc_id, chunk_index, title, text, embedding FROM chunks")
+        rows = cursor.fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["embedding"] = json.loads(d["embedding"])
+            result.append(d)
+        return result
 
 async def get_all_chunks() -> List[Dict[str, Any]]:
     return await asyncio.to_thread(_sync_get_all_chunks)
 
 def _sync_delete_document(doc_id: int) -> bool:
+    global _USE_POSTGRES
     if is_postgres():
-        with _get_pg_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM chunks WHERE doc_id = %s;", (doc_id,))
-                cursor.execute("DELETE FROM documents WHERE id = %s;", (doc_id,))
-                conn.commit()
-                return cursor.rowcount > 0
-    else:
-        with _get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
-            cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
-            conn.commit()
-            return cursor.rowcount > 0
+        try:
+            with _get_pg_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM chunks WHERE doc_id = %s;", (doc_id,))
+                    cursor.execute("DELETE FROM documents WHERE id = %s;", (doc_id,))
+                    conn.commit()
+                    return cursor.rowcount > 0
+        except Exception as e:
+            print(f"[Database Error] Postgres delete_document failed: {e}. Falling back to SQLite.")
+            _USE_POSTGRES = False
+
+    with _get_sqlite_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+        cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+        conn.commit()
+        return cursor.rowcount > 0
 
 async def delete_document(doc_id: int) -> bool:
     return await asyncio.to_thread(_sync_delete_document, doc_id)
 
 def _sync_record_chat(question: str, answer: str, provider: str, contexts: List[Dict[str, Any]]):
+    global _USE_POSTGRES
     ctx_json = json.dumps(contexts)
     if is_postgres():
-        with _get_pg_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO chat_history (question, answer, provider, contexts) VALUES (%s, %s, %s, %s);",
-                    (question, answer, provider, ctx_json)
-                )
-            conn.commit()
-    else:
-        with _get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO chat_history (question, answer, provider, contexts) VALUES (?, ?, ?, ?)",
-                (question, answer, provider, ctx_json)
-            )
-            conn.commit()
+        try:
+            with _get_pg_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO chat_history (question, answer, provider, contexts) VALUES (%s, %s, %s, %s);",
+                        (question, answer, provider, ctx_json)
+                    )
+                conn.commit()
+                return
+        except Exception as e:
+            print(f"[Database Error] Postgres record_chat failed: {e}. Falling back to SQLite.")
+            _USE_POSTGRES = False
+
+    with _get_sqlite_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO chat_history (question, answer, provider, contexts) VALUES (?, ?, ?, ?)",
+            (question, answer, provider, ctx_json)
+        )
+        conn.commit()
 
 async def record_chat(question: str, answer: str, provider: str, contexts: List[Dict[str, Any]]):
     await asyncio.to_thread(_sync_record_chat, question, answer, provider, contexts)
 
 def _sync_get_doc_count() -> int:
+    global _USE_POSTGRES
     if is_postgres():
-        with _get_pg_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) as cnt FROM documents;")
-                row = cursor.fetchone()
-                return int(row["cnt"]) if row else 0
-    else:
-        with _get_sqlite_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM documents")
-            row = cursor.fetchone()
-            return row[0] if row else 0
+        try:
+            with _get_pg_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT COUNT(*) as cnt FROM documents;")
+                    row = cursor.fetchone()
+                    return int(row["cnt"]) if row else 0
+        except Exception as e:
+            print(f"[Database Error] Postgres get_doc_count failed: {e}. Falling back to SQLite.")
+            _USE_POSTGRES = False
+
+    with _get_sqlite_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM documents")
+        row = cursor.fetchone()
+        return row[0] if row else 0
 
 async def get_doc_count() -> int:
     return await asyncio.to_thread(_sync_get_doc_count)

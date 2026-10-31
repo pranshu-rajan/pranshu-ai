@@ -1,6 +1,8 @@
 import httpx
 import json
 import os
+import time
+import asyncio
 import hashlib
 import numpy as np
 from typing import List, AsyncGenerator, Optional, Dict, Any, Tuple
@@ -14,6 +16,8 @@ class LLMClient:
         self.groq_api_key = settings.GROQ_API_KEY
         self.groq_model = settings.GROQ_MODEL
         self.openai_api_key = settings.OPENAI_API_KEY
+        self._ollama_checked_at = 0.0
+        self._ollama_is_up = False
 
     def reload_keys(self):
         """Reload keys from environment if updated at runtime."""
@@ -21,12 +25,41 @@ class LLMClient:
         self.groq_model = os.getenv("GROQ_MODEL", settings.GROQ_MODEL)
         self.openai_api_key = os.getenv("OPENAI_API_KEY", settings.OPENAI_API_KEY)
 
-    async def is_ollama_available(self) -> bool:
+    def _is_ollama_reachable_fast(self) -> bool:
+        import socket
+        import urllib.parse
         try:
-            async with httpx.AsyncClient(timeout=1.5) as client:
-                res = await client.get(f"{self.ollama_host}/api/tags")
-                return res.status_code == 200
+            parsed = urllib.parse.urlparse(self.ollama_host)
+            host = parsed.hostname or "127.0.0.1"
+            if host in ("localhost", "127.0.0.1", "0.0.0.0"):
+                host = "127.0.0.1"
+            port = parsed.port or 11434
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.15)
+                s.connect((host, port))
+                return True
         except Exception:
+            return False
+
+    async def is_ollama_available(self) -> bool:
+        now = time.time()
+        # Cache check for 60 seconds to prevent blocking repeated embeddings
+        if now - self._ollama_checked_at < 60.0:
+            return self._ollama_is_up
+        self._ollama_checked_at = now
+
+        # Fast direct socket probe (<1ms)
+        if not self._is_ollama_reachable_fast():
+            self._ollama_is_up = False
+            return False
+
+        try:
+            async with httpx.AsyncClient(timeout=1.0) as client:
+                res = await client.get(f"{self.ollama_host}/api/tags")
+                self._ollama_is_up = (res.status_code == 200)
+                return self._ollama_is_up
+        except Exception:
+            self._ollama_is_up = False
             return False
 
     async def get_active_provider_info(self) -> Tuple[str, str]:
@@ -39,15 +72,15 @@ class LLMClient:
         return "embedded-engine", "Deterministic-v2"
 
     def _fallback_embedding(self, text: str, dims: int = 768) -> List[float]:
-        """Deterministic semantic-like fallback vector when Ollama/APIs are offline."""
+        """Fast, deterministic semantic-like fallback vector when Ollama/APIs are offline."""
         seed = int(hashlib.sha256(text.encode('utf-8')).hexdigest()[:8], 16)
-        rng = np.random.RandomState(seed)
-        words = text.lower().split()
-        v = rng.normal(0, 1, dims).astype(np.float32)
-        for w in words[:20]:
-            w_seed = int(hashlib.md5(w.encode('utf-8')).hexdigest()[:8], 16)
-            w_rng = np.random.RandomState(w_seed)
-            v += w_rng.normal(0, 0.5, dims).astype(np.float32)
+        rng = np.random.default_rng(seed)
+        v = rng.standard_normal(dims).astype(np.float32)
+        words = text.lower().split()[:20]
+        if words:
+            word_hashes = np.array([int(hashlib.md5(w.encode('utf-8')).hexdigest()[:6], 16) % 1000 - 500 for w in words], dtype=np.float32)
+            factor = np.resize(word_hashes, dims) * 0.001
+            v += factor
         norm = np.linalg.norm(v) + 1e-9
         return (v / norm).tolist()
 
@@ -88,18 +121,17 @@ class LLMClient:
     async def generate_stream(self, prompt: str, system_prompt: Optional[str] = None) -> AsyncGenerator[str, None]:
         self.reload_keys()
         
-        # 1. Prioritize Groq API with GPT-OSS-120B
+        # 1. Prioritize Groq API with ultra-fast LLM inference
         clean_key = (self.groq_api_key or "").strip().strip('"').strip("'")
         if clean_key and len(clean_key) > 5:
+            configured_model = (self.groq_model or "openai/gpt-oss-120b").strip().strip('"').strip("'")
             models_to_try = [
-                (self.groq_model or "openai/gpt-oss-120b").strip().strip('"').strip("'"),
+                configured_model,
                 "openai/gpt-oss-120b",
-                "gpt-oss-120b",
-                "openai/gpt-oss-20b",
-                "gpt-oss-20b",
-                "llama-3.1-8b-instant",
                 "llama-3.3-70b-versatile",
-                "llama3-70b-8192"
+                "llama-3.1-8b-instant",
+                "mixtral-8x7b-32768",
+                "gemma2-9b-it"
             ]
             candidate_models = list(dict.fromkeys(models_to_try))
 
@@ -134,8 +166,9 @@ class LLMClient:
                                         if delta:
                                             yield delta
                                 return
-                            elif res.status_code == 404:
-                                # Try next model
+                            elif res.status_code in (400, 404):
+                                # Bad model name or deprecated model on Groq, try next candidate model
+                                error_bytes = await res.aread()
                                 continue
                             else:
                                 error_bytes = await res.aread()
