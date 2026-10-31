@@ -6,7 +6,7 @@
 [![Database](https://img.shields.io/badge/Database-Supabase%20%2B%20SQLite-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
-> **A high-performance Vector Database and multi-stage Question-Answering (RAG) system built from scratch.**  
+> **A high-performance Vector Database and 2026 multi-stage Question-Answering (RAG) system built from scratch.**  
 > Designed to make searching through millions of complex AI thoughts fast, accurate, fault-tolerant, and easy to visualize.
 
 - 🌐 **Live Web App**: [https://pranshu-ai.vercel.app](https://pranshu-ai.vercel.app)
@@ -24,7 +24,7 @@
 2. [The Problems with Existing Solutions (What Existed Before)](#-the-problems-with-existing-solutions-what-existed-before)
 3. [What Pranshu's AI Solves & How (The Breakthroughs)](#-what-pranshus-ai-solves--how-the-breakthroughs)
    - [Breakthrough 1: Multi-Layer Expressway Search (HNSW)](#breakthrough-1-multi-layer-expressway-search-hnsw)
-   - [Breakthrough 2: The 3-Stage Smart RAG Pipeline](#breakthrough-2-the-3-stage-smart-rag-pipeline)
+   - [Breakthrough 2: The 2026 Multi-Stage Advanced RAG Pipeline](#breakthrough-2-the-2026-multi-stage-advanced-rag-pipeline)
    - [Breakthrough 3: Unbreakable Dual-Database Reliability](#breakthrough-3-unbreakable-dual-database-reliability)
    - [Breakthrough 4: Visualizing AI Thinking in 2D](#breakthrough-4-visualizing-ai-thinking-in-2d)
 4. [Deep Dive into the 5 Interactive Workspaces](#-deep-dive-into-the-5-interactive-workspaces)
@@ -60,7 +60,7 @@ AI language models (like ChatGPT or LLaMA) have a major problem: **they hallucin
 2. It gives those paragraphs to the AI as reference material.
 3. The AI reads the reference material and writes a 100% accurate, factual answer with exact citations.
 
-**Pranshu's AI is an entire, production-grade Vector Database and Advanced RAG engine built from scratch**, complete with an interactive web visualizer that lets you see vectors, graphs, and search algorithms working in real time.
+**Pranshu's AI is an entire, production-grade Vector Database and 2026 Advanced RAG engine built from scratch**, complete with an interactive web visualizer that lets you see vectors, graphs, and search algorithms working in real time.
 
 ---
 
@@ -72,9 +72,10 @@ Before building this project, several major limitations existed across both acad
 |:-:|:---|:---|
 | **1** | **Traditional Databases Are Too Slow for AI Vectors** | Standard database indexes (called B-Trees) can only sort numbers in one line (1 dimension). When AI vectors have 768 or 1536 dimensions, traditional databases have to check every single item one-by-one. If you have 1 million items, it does 1 million checks. That is called the **"Curse of Dimensionality"**. |
 | **2** | **Spatial Trees (like KD-Trees) Break Down** | Standard computer science teaches KD-Trees to find points in 2D or 3D space (like video games or maps). But once you exceed 10 dimensions, KD-Trees mathematically slow down to the point where they are just as slow as checking every item by hand. |
-| **3** | **Basic RAG Has a "Keyword Blindspot"** | Basic vector search looks only at "general meaning". If you search for an exact part number like `TX-9042`, vector search often fails because it misses the exact spelling. Conversely, old keyword search (like Ctrl+F) misses synonyms completely. |
+| **3** | **The Keyword Blindspot in Naive RAG** | Basic vector search looks only at "general meaning". If you search for an exact part number like `TX-9042`, vector search often fails because it misses the exact spelling. Conversely, old keyword search (like Ctrl+F) misses synonyms completely. |
 | **4** | **The Question-to-Document Disconnect** | When a user asks: *"Why did the system restart?"*, that short question looks mathematically different from the answer paragraph: *"Server node 4 underwent an automatic thermal reboot"*. Pure vector search frequently fails to link the question to the answer. |
-| **5** | **Cloud Fragility & Crashing** | Most modern AI apps rely on remote cloud vector services. If the cloud database drops for even two seconds, the entire website crashes with an internal server error. |
+| **5** | **Context Redundancy & Hallucination** | Naive RAG dumps raw, duplicate chunks into the prompt, overwhelming the model with repetitive text and leaving blindspots when retrieval quality is poor. |
+| **6** | **Cloud Fragility & Crashing** | Most modern AI apps rely on remote cloud vector services. If the cloud database drops for even two seconds, the entire website crashes with an internal server error. |
 
 ---
 
@@ -108,54 +109,100 @@ Instead of checking 1,000,000 items one by one ($\mathcal{O}(N)$), HNSW only tak
 
 ---
 
-### Breakthrough 2: The 3-Stage Smart RAG Pipeline
+### Breakthrough 2: The 2026 Multi-Stage Advanced RAG Pipeline
 
-Instead of naive vector lookup, Pranshu's AI uses an intelligent three-stage retrieval pipeline that ensures the AI always finds the exact right paragraph:
+Instead of a basic one-step vector lookup, Pranshu's AI implements a state-of-the-art **2026 multi-stage retrieval and validation pipeline**:
 
 ```
-User Question
-     │
-     ▼
+[User Question]
+       │
+       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. HyDE Expansion                                           │
-│ The AI guesses what an ideal answer document would say.     │
-│ Now we search using the "ideal answer" instead of a prompt! │
+│ 1. Context-Enriched Ingestion (Provenance Preservation)     │
+│ Each chunk is tagged with its parent document and section:  │
+│ "[Document: Title | Section 2/5]" before vectorization.     │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 2. HyDE Expansion (Hypothetical Document Embeddings)        │
+│ The AI predicts what an ideal answer passage would say.     │
+│ Search is conducted using the answer space, not a prompt!   │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                ┌───────────────┴───────────────┐
                ▼                               ▼
 ┌──────────────────────────────┐ ┌────────────────────────────┐
-│ 2A. Dense Meaning Search     │ │ 2B. Exact Keyword Search   │
-│ (HNSW Vector Graph)          │ │ (BM25 Frequency Index)     │
-│ Finds conceptual ideas       │ │ Finds exact codes & names  │
+│ 3A. Dense Meaning Search     │ │ 3B. Exact Keyword Search   │
+│ (Native HNSW Proximity Graph)│ │ (BM25 Frequency Inverted)  │
+│ Captures deep intent         │ │ Captures exact codes/names │
 └──────────────┬───────────────┘ └─────────────┬──────────────┘
                │                               │
                └───────────────┬───────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Reciprocal Rank Fusion (RRF)                                │
-│ Combines the best of both worlds with zero bias.            │
+│ 4. Weighted Reciprocal Rank Fusion (Weighted RRF)           │
+│ Merges ranks with tuned weights (0.6 Dense / 0.4 Sparse):   │
+│ Score(d) = 0.6/(60 + rank_dense) + 0.4/(60 + rank_sparse)   │
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. Contextual Cross-Encoder Re-Ranking                      │
-│ Reads through top candidates and removes irrelevant noise.  │
+│ 5. Semantic Diversity Deduplication (MMR-Inspired)          │
+│ Compares Jaccard token overlap (> 65% similarity pruned).   │
+│ Prevents consecutive duplicate paragraphs from filling space│
 └──────────────────────────────┬──────────────────────────────┘
                                │
                                ▼
-          Top Accurate Context → Final AI Answer
+┌─────────────────────────────────────────────────────────────┐
+│ 6. Contextual Cross-Encoder Re-Ranking                      │
+│ Evaluates joint question-passage token interactions.        │
+│ Scores semantic alignment and prunes false-positive noise.  │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 7. Corrective RAG (CRAG) Retrieval Quality Grading          │
+│ Analyzes top scores: grades as HIGH, MEDIUM, or LOW.        │
+│ Injects epistemic alerts if document evidence is partial.   │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 8. Generation with Inline Ground-Truth Citations            │
+│ Streams factual answer with strict bracket links: [1], [2]. │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-1. **HyDE (Hypothetical Document Embeddings)**:
+#### Detailed Breakdown of the 2026 Techniques:
+
+1. **Context-Enriched Ingestion**:
+   - In standard RAG, chunks stripped of context lose their document meaning.
+   - We automatically prefix each chunk: `[Document: {title} | Section {idx + 1}/{total}]`. The vector embedding encodes both the macro document subject and the micro section details.
+
+2. **HyDE Expansion (Hypothetical Document Embeddings)**:
    - When you ask a question, the AI writes a temporary "hypothetical answer" behind the scenes.
-   - We search the database using this hypothetical answer. Because an answer looks like the documents in your library, the search accuracy jumps significantly.
-2. **Hybrid Search (BM25 + Dense Vector Search via RRF)**:
+   - We search the database using this hypothetical answer. Because an answer looks like the documents in your library, search precision jumps dramatically.
+
+3. **Weighted Reciprocal Rank Fusion (Weighted RRF)**:
    - We run **two searches simultaneously**: an HNSW semantic search (for conceptual meaning) and a BM25 keyword search (for exact spellings, part numbers, and names).
-   - We blend both results using a mathematical formula called **Reciprocal Rank Fusion (RRF)**. You never miss an exact keyword, and you never miss a synonym.
-3. **Contextual Cross-Encoder Re-Ranking**:
-   - The top candidates are evaluated side-by-side with your original question.
-   - Any passage that looked promising but isn't truly relevant is discarded. The AI only receives pure, clean signal.
+   - Rather than an uncalibrated 50/50 split, we apply a tuned **$w_{\text{dense}}=0.6$ / $w_{\text{sparse}}=0.4$** formula:
+     $$\text{RRF\_Score}(d) = \frac{0.6}{60 + \text{rank}_{\text{dense}}(d)} + \frac{0.4}{60 + \text{rank}_{\text{sparse}}(d)}$$
+
+4. **Semantic Diversity Deduplication**:
+   - Similar chunks from the same document often crowd out other relevant sources.
+   - Our Jaccard token filter checks incoming candidates: if a candidate has $>65\%$ token overlap with an already selected chunk, it is suppressed in favor of diverse, novel evidence.
+
+5. **Contextual Cross-Encoder Re-Ranking**:
+   - Every candidate chunk is evaluated side-by-side with your original question.
+   - Combines vector distance penalties with exact token intersections so only the most authoritative passages reach the AI.
+
+6. **Corrective RAG (CRAG) Confidence Grading**:
+   - The engine automatically grades retrieval quality into **`HIGH`**, **`MEDIUM`**, or **`LOW`**.
+   - If confidence is `LOW` (the documents only partially cover the question), the system warns the AI prompt to honestly state the limit of its knowledge base rather than making up facts.
+
+7. **Inline Citation Grounding**:
+   - The final answer is synthesized with explicit bracketed citations like `[1]` or `[2]`. Users can click directly on the citation badge in the Knowledge Hub to read the exact underlying source chunk.
 
 ---
 
@@ -218,16 +265,17 @@ The frontend interface features an **Aether Light** design system with a respons
   - Add new custom vectors or inspect full 16-float coordinate sets.
 
 ### 5. 💬 Advanced RAG Studio (Knowledge Hub & Chat)
-- **What it does**: An interactive two-panel studio for chatting with documents.
+- **What it does**: An interactive two-panel studio for chatting with documents powered by 2026 RAG techniques.
 - **Left Panel (Live Chat)**:
   - Ask questions in natural language.
   - Watch the answer stream in real time token-by-token.
+  - Inspect the **CRAG Confidence Badge** (`CRAG: HIGH`, `CRAG: MEDIUM`, `CRAG: LOW`) in real time.
   - See the generated **HyDE Hypothetical Document** in a callout pill.
-  - Click on **Source Citation Badges** to see exactly which page and chunk informed each statement.
+  - Click on **Source Citation Badges** to see exactly which chunk informed each statement.
 - **Right Panel (Knowledge Hub)**:
   - **Documents Tab**: View and manage all uploaded documents and chunk counts.
   - **Upload Tab**: Drag-and-drop PDFs, text files, markdown, or code, or paste raw text. The system automatically chunks the text and builds HNSW index vectors.
-  - **Retrieved Chunks Tab**: Inspect the exact text passages retrieved for your query, along with their cosine distance and reranking scores.
+  - **Retrieved Chunks Tab**: Inspect the exact text passages retrieved for your query, along with their CRAG confidence tag, cosine distance, and reranking scores.
 
 ---
 
@@ -247,11 +295,14 @@ Here is how data flows from user input to the final response:
    │     • Sub-millisecond vector similarity
    │     • Multi-layer expressways
    │
-   ├─► [RAG Engine: 3-Stage Pipeline]
+   ├─► [2026 Advanced RAG Engine: Multi-Stage Pipeline]
+   │     • Context-enriched chunking
    │     • HyDE query expansion
    │     • Dense (HNSW) + Sparse (BM25) search
-   │     • Reciprocal Rank Fusion (RRF)
+   │     • Weighted Reciprocal Rank Fusion (Weighted RRF)
+   │     • Semantic diversity deduplication
    │     • Contextual cross-encoder reranking
+   │     • CRAG confidence assessment (High / Med / Low)
    │
    ├─► [Database Layer: Auto-Healing Dual Persistence]
    │     • Primary: Supabase PostgreSQL (Cloud)
@@ -313,7 +364,7 @@ uvicorn app.main:app --reload --port 8000
 
 ### Step 3: Start the Frontend (Terminal 2)
 ```bash
-cd frontend
+cd ../frontend
 npm install
 npm run dev
 ```
