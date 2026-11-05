@@ -29,64 +29,64 @@ export default function Home() {
         return {
           title: "Vector Space Explorer",
           subtitle:
-            "Interactive 2D PCA projection of high-dimensional embeddings across semantic categories.",
+            "Cartographic 2D PCA projection of high-dimensional embeddings across semantic categories.",
           badges: [
-            { label: `${status?.demoCount ?? 20} Vectors`, variant: "indigo" as const, dot: true },
-            { label: "16D → 2D PCA", variant: "slate" as const },
-            { label: "Cosine Metric", variant: "cyan" as const },
+            { label: `${status?.demoCount ?? 20} VECTORS`, variant: "indigo" as const, dot: true },
+            { label: "16D → 2D PROJECTION", variant: "slate" as const },
+            { label: "COSINE METRIC", variant: "cyan" as const },
           ],
         };
       case "hnsw":
         return {
           title: "HNSW Proximity Graph",
           subtitle:
-            "Explore multi-layer Hierarchical Navigable Small World graphs and simulate greedy routing hops.",
+            "Hierarchical Navigable Small World multi-layer proximity topology and simulated greedy routing hops.",
           badges: [
-            { label: "Multi-layer Graph", variant: "violet" as const, dot: true },
-            { label: "M=16 • ef=64", variant: "slate" as const },
-            { label: "O(log N) Routing", variant: "emerald" as const },
+            { label: "TOPOLOGY LAYER", variant: "indigo" as const, dot: true },
+            { label: "M=16 • EF=64", variant: "slate" as const },
+            { label: "O(LOG N) ROUTING", variant: "emerald" as const },
           ],
         };
       case "benchmark":
         return {
           title: "Performance Arena",
           subtitle:
-            "Real-time latency and recall comparison across Brute Force Flat, KD-Tree, and HNSW graph search.",
+            "Real-time microsecond latency telemetry across Brute-Force Flat, KD-Tree, and HNSW graph search.",
           badges: [
-            { label: "Latency Benchmark", variant: "amber" as const, dot: true },
-            { label: "Sub-millisecond", variant: "emerald" as const },
-            { label: "Real-time Native", variant: "slate" as const },
+            { label: "TELEMETRY LAB", variant: "amber" as const, dot: true },
+            { label: "SUB-MILLISECOND", variant: "emerald" as const },
+            { label: "NATIVE COMPUTE", variant: "slate" as const },
           ],
         };
       case "rag":
         return {
           title: "Advanced RAG Studio",
           subtitle:
-            "Multi-stage QA pipeline with HyDE hypothetical document expansion, BM25 hybrid search, and reranking.",
+            "Multi-stage research console: HyDE hypothetical document expansion, BM25 hybrid search, and CRAG confidence.",
           badges: [
             {
               label:
                 status?.provider === "groq"
-                  ? `Groq: ${(status.genModel || "").replace("openai/", "")}`
+                  ? `GROQ: ${(status.genModel || "").replace("openai/", "").toUpperCase()}`
                   : status?.ollamaAvailable
-                  ? `Ollama: ${status.genModel || "Local"}`
-                  : "Engine: FastAPI",
+                  ? `OLLAMA: ${(status.genModel || "LOCAL").toUpperCase()}`
+                  : "FASTAPI ENGINE",
               variant: "indigo" as const,
               dot: true,
             },
-            { label: `${status?.docCount ?? 1} Documents (768D)`, variant: "violet" as const },
-            { label: "Hybrid + HyDE + Rerank", variant: "emerald" as const },
+            { label: `${status?.docCount ?? 1} DOCUMENTS (768D)`, variant: "slate" as const },
+            { label: "HYBRID • HYDE • RERANK", variant: "emerald" as const },
           ],
         };
       case "vectors":
         return {
           title: "Vector Catalog & Registry",
           subtitle:
-            "Browse, filter, inspect embedding dimensions, and register new vectors into the index.",
+            "Inspect high-dimensional vector embeddings, filter categories, and register new mathematical vectors.",
           badges: [
-            { label: `${status?.demoCount ?? 20} Indexed Vectors`, variant: "cyan" as const, dot: true },
-            { label: "16-dim & 768-dim", variant: "slate" as const },
-            { label: "Persistent Storage", variant: "emerald" as const },
+            { label: `${status?.demoCount ?? 20} INDEXED VECTORS`, variant: "cyan" as const, dot: true },
+            { label: "16D & 768D DIMS", variant: "slate" as const },
+            { label: "PERSISTENT DB", variant: "emerald" as const },
           ],
         };
       default:
@@ -101,7 +101,7 @@ export default function Home() {
   const header = getHeaderProps();
 
   return (
-    <div className="flex min-h-screen bg-[#FAFBFD]">
+    <div className="flex min-h-screen bg-[#F7F6F3]">
       {/* Left Sidebar */}
       <Sidebar
         activeTab={activeTab}
@@ -111,7 +111,7 @@ export default function Home() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-7 max-w-7xl w-full mx-auto">
           {/* Dynamic Page Header */}
           <PageHeader
             title={header.title}
@@ -120,7 +120,7 @@ export default function Home() {
           />
 
           {/* Active Tab View */}
-          <div className="animate-fade-in">
+          <div className="animate-fadeIn">
             {activeTab === "space" && <SpaceExplorer />}
             {activeTab === "hnsw" && <HnswInspector />}
             {activeTab === "benchmark" && <BenchmarkArena />}
@@ -129,15 +129,15 @@ export default function Home() {
           </div>
         </main>
 
-        {/* Clean Light Footer */}
-        <footer className="border-t border-slate-200/80 bg-white/50 py-5 text-center text-xs text-slate-500">
+        {/* 2026 Swiss Instrument Footer */}
+        <footer className="border-t border-[#E3DED6] bg-[#FAF9F7] py-4 text-center text-xs text-[#555C68]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <p className="font-medium text-slate-600">
-              Pranshu&apos;s AI • Production Vector Database & Advanced RAG • Designed & Engineered by{" "}
-              <strong className="text-slate-800 font-semibold">Rajan Pranshu Piyushkumar</strong>
+            <p className="font-medium text-[#111315]">
+              Pranshu&apos;s AI • Production Vector Database & Advanced RAG System • Authored by{" "}
+              <strong className="text-[#0935B8] font-semibold">Rajan Pranshu Piyushkumar</strong>
             </p>
-            <p className="mt-1 text-[11px] text-slate-400 font-mono">
-              Next.js 15 • Tailwind CSS • TypeScript • FastAPI • HNSW • KD-Tree • BM25 • HyDE
+            <p className="mt-1 text-[11px] text-[#7E8794] font-mono tabular-nums">
+              Next.js 15 • Tailwind CSS • TypeScript • FastAPI • HNSW • KD-Tree • BM25 • HyDE • CRAG
             </p>
           </div>
         </footer>

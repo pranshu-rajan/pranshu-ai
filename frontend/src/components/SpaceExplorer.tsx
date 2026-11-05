@@ -3,14 +3,17 @@
 import React, { useEffect, useRef, useState } from "react";
 import { PcaPoint } from "../lib/types";
 import { fetchPcaPoints } from "../lib/api";
-import { Compass, ZoomIn, ZoomOut, RotateCcw, Target, Sparkles, Filter } from "lucide-react";
+import { Compass, ZoomIn, ZoomOut, RotateCcw, Target, Sparkles, Filter, Crosshair } from "lucide-react";
 import Badge from "./ui/Badge";
 
-const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string; glow: string }> = {
-  "Computer Science": { bg: "#4F46E5", border: "#6366F1", text: "#312E81", glow: "rgba(99, 102, 241, 0.25)" },
-  "Mathematics": { bg: "#8B5CF6", border: "#A78BFA", text: "#4C1D95", glow: "rgba(139, 92, 246, 0.25)" },
-  "Food": { bg: "#D97706", border: "#FBBF24", text: "#78350F", glow: "rgba(217, 119, 6, 0.25)" },
-  "Sports": { bg: "#059669", border: "#34D399", text: "#064E3B", glow: "rgba(5, 150, 105, 0.25)" },
+const CATEGORY_SPECS: Record<
+  string,
+  { color: string; border: string; bgLight: string; text: string; shape: "diamond" | "square" | "circle" | "triangle"; symbol: string }
+> = {
+  "Computer Science": { color: "#0935B8", border: "#082B96", bgLight: "#EEF3FF", text: "#0935B8", shape: "diamond", symbol: "◆" },
+  "Mathematics": { color: "#4338CA", border: "#3730A3", bgLight: "#EEF2FF", text: "#4338CA", shape: "square", symbol: "■" },
+  "Food": { color: "#C2410C", border: "#9A3412", bgLight: "#FFF7ED", text: "#C2410C", shape: "circle", symbol: "●" },
+  "Sports": { color: "#0D5F52", border: "#064E3B", bgLight: "#F0FDF4", text: "#0D5F52", shape: "triangle", symbol: "▲" },
 };
 
 export const SpaceExplorer: React.FC = () => {
@@ -32,7 +35,7 @@ export const SpaceExplorer: React.FC = () => {
     });
   }, []);
 
-  // Compute nearest neighbors to selectedPoint based on 2D euclidean distance on PCA plane
+  // Compute nearest neighbors to selectedPoint based on 2D Euclidean distance on PCA plane
   const nearestNeighbors = React.useMemo(() => {
     if (!selectedPoint || points.length === 0) return [];
     return points
@@ -56,6 +59,32 @@ export const SpaceExplorer: React.FC = () => {
 
     let animationFrameId: number;
 
+    const drawGlyph = (
+      context: CanvasRenderingContext2D,
+      x: number,
+      y: number,
+      size: number,
+      shape: "diamond" | "square" | "circle" | "triangle"
+    ) => {
+      context.beginPath();
+      if (shape === "circle") {
+        context.arc(x, y, size, 0, Math.PI * 2);
+      } else if (shape === "square") {
+        context.rect(x - size, y - size, size * 2, size * 2);
+      } else if (shape === "diamond") {
+        context.moveTo(x, y - size * 1.3);
+        context.lineTo(x + size * 1.3, y);
+        context.lineTo(x, y + size * 1.3);
+        context.lineTo(x - size * 1.3, y);
+        context.closePath();
+      } else if (shape === "triangle") {
+        context.moveTo(x, y - size * 1.3);
+        context.lineTo(x + size * 1.2, y + size * 0.9);
+        context.lineTo(x - size * 1.2, y + size * 0.9);
+        context.closePath();
+      }
+    };
+
     const render = () => {
       const width = canvas.width;
       const height = canvas.height;
@@ -65,32 +94,57 @@ export const SpaceExplorer: React.FC = () => {
 
       ctx.clearRect(0, 0, width, height);
 
-      // Light background fill
-      ctx.fillStyle = "#F8FAFC";
+      // Warm Alabaster Canvas Base
+      ctx.fillStyle = "#F7F6F3";
       ctx.fillRect(0, 0, width, height);
 
-      // 1. Draw Radar Grid
+      // 1. Technical Cartographic Gridlines
       ctx.save();
-      ctx.strokeStyle = "#E2E8F0";
+      ctx.strokeStyle = "rgba(227, 222, 214, 0.65)";
       ctx.lineWidth = 1;
 
-      // Concentric circles
+      // Concentric Range Rings
       [40, 80, 120, 160].forEach((r) => {
         ctx.beginPath();
         ctx.arc(centerX, centerY, r * scale * 0.4, 0, Math.PI * 2);
         ctx.stroke();
+
+        // Distance range label
+        ctx.fillStyle = "#A8A090";
+        ctx.font = "9px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(`r=${r}`, centerX + r * scale * 0.4, centerY - 2);
       });
 
-      // Axis lines
+      // Axis Crosshairs
+      ctx.strokeStyle = "rgba(200, 193, 180, 0.85)";
       ctx.beginPath();
       ctx.moveTo(centerX, 0);
       ctx.lineTo(centerX, height);
       ctx.moveTo(0, centerY);
       ctx.lineTo(width, centerY);
       ctx.stroke();
+
+      // Axis Tick Marks every 30px
+      const tickSpacing = 30 * scale * 0.4;
+      for (let offset = tickSpacing; offset < Math.max(width, height); offset += tickSpacing) {
+        // X-axis ticks
+        ctx.beginPath();
+        ctx.moveTo(centerX + offset, centerY - 3);
+        ctx.lineTo(centerX + offset, centerY + 3);
+        ctx.moveTo(centerX - offset, centerY - 3);
+        ctx.lineTo(centerX - offset, centerY + 3);
+        // Y-axis ticks
+        ctx.moveTo(centerX - 3, centerY + offset);
+        ctx.lineTo(centerX + 3, centerY + offset);
+        ctx.moveTo(centerX - 3, centerY - offset);
+        ctx.lineTo(centerX + 3, centerY - offset);
+        ctx.stroke();
+      }
       ctx.restore();
 
-      // 2. Draw Distance Beams to Nearest Neighbors
+      // 2. Nearest Neighbor Distance Calipers
       if (selectedPoint) {
         const sx = centerX + selectedPoint.x * scale;
         const sy = centerY + selectedPoint.y * scale;
@@ -100,44 +154,60 @@ export const SpaceExplorer: React.FC = () => {
           const ny = centerY + nPoint.y * scale;
 
           ctx.save();
-          // Soft modern gradient beam
-          const grad = ctx.createLinearGradient(sx, sy, nx, ny);
-          grad.addColorStop(0, "rgba(79, 70, 229, 0.75)");
-          grad.addColorStop(1, "rgba(139, 92, 246, 0.3)");
-          ctx.strokeStyle = grad;
-          ctx.lineWidth = 2;
-          ctx.setLineDash([4, 4]);
+          // Crisp dashed measurement line
+          ctx.strokeStyle = "#0935B8";
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([3, 3]);
           ctx.beginPath();
           ctx.moveTo(sx, sy);
           ctx.lineTo(nx, ny);
           ctx.stroke();
 
-          // Draw distance tag pill
+          // Caliper numeric pill at midpoint
           const midX = (sx + nx) / 2;
           const midY = (sy + ny) / 2;
           ctx.fillStyle = "#FFFFFF";
-          ctx.shadowColor = "rgba(0, 0, 0, 0.08)";
-          ctx.shadowBlur = 6;
-          ctx.shadowOffsetY = 2;
+          ctx.shadowColor = "rgba(17, 19, 21, 0.08)";
+          ctx.shadowBlur = 4;
+          ctx.shadowOffsetY = 1;
           ctx.beginPath();
-          ctx.roundRect ? ctx.roundRect(midX - 24, midY - 10, 48, 20, 10) : ctx.rect(midX - 24, midY - 10, 48, 20);
+          if (ctx.roundRect) {
+            ctx.roundRect(midX - 26, midY - 9, 52, 18, 4);
+          } else {
+            ctx.rect(midX - 26, midY - 9, 52, 18);
+          }
           ctx.fill();
 
           ctx.shadowColor = "transparent";
-          ctx.strokeStyle = "#CBD5E1";
+          ctx.strokeStyle = "#DCD5C9";
           ctx.lineWidth = 1;
           ctx.stroke();
 
-          ctx.fillStyle = "#4F46E5";
-          ctx.font = "bold 10px monospace";
+          ctx.fillStyle = "#0935B8";
+          ctx.font = "bold 9px monospace";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(`d=${dist}`, midX, midY + 1);
+          ctx.fillText(`d=${dist}`, midX, midY + 0.5);
           ctx.restore();
         });
+
+        // Targeting reticle around selected point
+        ctx.save();
+        ctx.strokeStyle = "#0935B8";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 18, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(9, 53, 184, 0.4)";
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.arc(sx, sy, 24, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       }
 
-      // 3. Draw Points
+      // 3. Draw All Projected Points
       points.forEach((p) => {
         if (selectedCategory !== "All" && p.category !== selectedCategory) return;
 
@@ -146,41 +216,59 @@ export const SpaceExplorer: React.FC = () => {
         const isSelected = selectedPoint?.id === p.id;
         const isHovered = hoveredPoint?.id === p.id;
         const isNeighbor = nearestNeighbors.some((n) => n.point.id === p.id);
-        const style = CATEGORY_COLORS[p.category] || CATEGORY_COLORS["Computer Science"];
+        const spec = CATEGORY_SPECS[p.category] || CATEGORY_SPECS["Computer Science"];
 
         ctx.save();
 
-        // Shadow / halo
+        const baseSize = isSelected ? 8 : isHovered ? 7.5 : isNeighbor ? 6.5 : 5;
+
+        // Subtle shadow
         if (isSelected || isNeighbor || isHovered) {
-          ctx.shadowColor = isSelected ? "rgba(79, 70, 229, 0.4)" : "rgba(0, 0, 0, 0.15)";
-          ctx.shadowBlur = isSelected ? 16 : 8;
-          ctx.shadowOffsetY = isSelected ? 4 : 2;
+          ctx.shadowColor = "rgba(17, 19, 21, 0.12)";
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetY = 2;
         }
 
-        ctx.beginPath();
-        const radius = isSelected ? 9 : isHovered ? 8 : isNeighbor ? 7 : 5.5;
-        ctx.arc(px, py, radius, 0, Math.PI * 2);
-        ctx.fillStyle = isSelected ? "#4F46E5" : style.bg;
+        drawGlyph(ctx, px, py, baseSize, spec.shape);
+        ctx.fillStyle = isSelected ? "#0935B8" : spec.color;
         ctx.fill();
 
-        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.lineWidth = isSelected ? 2.5 : 1.5;
         ctx.strokeStyle = "#FFFFFF";
         ctx.stroke();
 
-        // Label on hover or selected
+        // Technical coordinate label on hover or selection
         if (isSelected || isHovered || isNeighbor) {
           ctx.shadowBlur = 0;
-          ctx.fillStyle = isSelected ? "#0F172A" : "#334155";
-          ctx.font = isSelected ? "bold 11px sans-serif" : "500 10px sans-serif";
+          ctx.font = isSelected ? "bold 10px monospace" : "500 10px sans-serif";
           ctx.textAlign = "left";
 
-          // Text background for legibility
-          const textMetrics = ctx.measureText(p.metadata);
-          ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-          ctx.fillRect(px + 12, py - 9, textMetrics.width + 8, 18);
+          const labelText = isSelected
+            ? `${p.metadata} [${p.x}, ${p.y}]`
+            : p.metadata;
 
-          ctx.fillStyle = isSelected ? "#4F46E5" : "#1E293B";
-          ctx.fillText(p.metadata, px + 16, py + 4);
+          const textMetrics = ctx.measureText(labelText);
+          ctx.fillStyle = "#FFFFFF";
+          ctx.strokeStyle = "#E3DED6";
+          ctx.lineWidth = 1;
+
+          const boxX = px + 12;
+          const boxY = py - 8;
+          const boxW = textMetrics.width + 10;
+          const boxH = 17;
+
+          if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, boxW, boxH, 3);
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillRect(boxX, boxY, boxW, boxH);
+            ctx.strokeRect(boxX, boxY, boxW, boxH);
+          }
+
+          ctx.fillStyle = isSelected ? "#0935B8" : "#111315";
+          ctx.fillText(labelText, boxX + 5, boxY + 12);
         }
 
         ctx.restore();
@@ -211,7 +299,6 @@ export const SpaceExplorer: React.FC = () => {
       return;
     }
 
-    // Hit test for points
     const width = canvas.width;
     const height = canvas.height;
     const centerX = width / 2 + pan.x;
@@ -230,7 +317,7 @@ export const SpaceExplorer: React.FC = () => {
       }
     }
     setHoveredPoint(found);
-    canvas.style.cursor = found ? "pointer" : isDragging ? "grabbing" : "grab";
+    canvas.style.cursor = found ? "pointer" : isDragging ? "grabbing" : "crosshair";
   };
 
   const handleMouseUp = () => setIsDragging(false);
@@ -244,101 +331,109 @@ export const SpaceExplorer: React.FC = () => {
   const categories = ["All", "Computer Science", "Mathematics", "Food", "Sports"];
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-      {/* 2D Space Canvas */}
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      {/* 2D Space Canvas Container */}
       <div className="surface-card relative flex flex-col overflow-hidden lg:col-span-2">
         {/* Radar Controls Header */}
-        <div className="flex flex-wrap items-center justify-between border-b border-slate-100 px-4 py-3 bg-white">
+        <div className="flex flex-wrap items-center justify-between border-b border-[#E3DED6] px-4 py-3 bg-[#FAF9F7]">
           <div className="flex items-center gap-2">
-            <Compass className="h-4 w-4 text-indigo-600" />
-            <span className="text-sm font-semibold text-slate-800">2D Semantic Space (PCA Projection)</span>
-            <span className="text-xs text-slate-500">({points.length} vectors)</span>
+            <Compass className="h-4 w-4 text-[#0935B8]" />
+            <span className="text-xs font-bold text-[#111315] uppercase tracking-wider font-mono">
+              2D Manifold Projection (PCA)
+            </span>
+            <span className="text-[10px] text-[#7E8794] font-mono tabular-nums">
+              [{points.length} VECTORS]
+            </span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setZoom((z) => Math.min(z + 0.2, 2.5))}
-              className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
+              className="rounded border border-[#DCD5C9] bg-white p-1 text-[#555C68] hover:text-[#111315] hover:bg-[#F3F1EC] transition shadow-xs"
               title="Zoom In"
             >
-              <ZoomIn className="h-4 w-4" />
+              <ZoomIn className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => setZoom((z) => Math.max(z - 0.2, 0.6))}
-              className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
+              className="rounded border border-[#DCD5C9] bg-white p-1 text-[#555C68] hover:text-[#111315] hover:bg-[#F3F1EC] transition shadow-xs"
               title="Zoom Out"
             >
-              <ZoomOut className="h-4 w-4" />
+              <ZoomOut className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => {
                 setZoom(1.0);
                 setPan({ x: 0, y: 0 });
               }}
-              className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
+              className="rounded border border-[#DCD5C9] bg-white p-1 text-[#555C68] hover:text-[#111315] hover:bg-[#F3F1EC] transition shadow-xs"
               title="Reset View"
             >
-              <RotateCcw className="h-4 w-4" />
+              <RotateCcw className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
 
         {/* Category Filters */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5 text-xs">
-          <div className="flex items-center gap-1.5 text-slate-500 mr-1">
-            <Filter className="h-3.5 w-3.5" />
-            <span className="font-medium text-[11px]">Filter:</span>
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E3DED6] bg-[#EDEAE3]/50 px-4 py-2 text-xs">
+          <div className="flex items-center gap-1 text-[#7E8794] mr-1">
+            <Filter className="h-3 w-3" />
+            <span className="font-mono text-[10px] uppercase">Filter:</span>
           </div>
           {categories.map((cat) => {
             const isSelected = selectedCategory === cat;
+            const spec = CATEGORY_SPECS[cat];
             return (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`rounded-full px-3 py-1 transition font-medium text-xs ${
+                className={`rounded px-2.5 py-0.5 transition font-mono text-[11px] flex items-center gap-1 ${
                   isSelected
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    ? "bg-[#111315] text-white shadow-xs font-semibold"
+                    : "bg-white text-[#555C68] hover:bg-[#F3F1EC] border border-[#DCD5C9]"
                 }`}
               >
-                {cat}
+                {spec && <span style={{ color: isSelected ? "#FFFFFF" : spec.color }}>{spec.symbol}</span>}
+                <span>{cat}</span>
               </button>
             );
           })}
         </div>
 
         {/* Canvas Area */}
-        <div className="relative h-[480px] w-full bg-[#F8FAFC]">
+        <div className="relative h-[490px] w-full bg-[#F7F6F3]">
           <canvas
             ref={canvasRef}
             width={800}
-            height={480}
+            height={490}
             className="h-full w-full"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onClick={handleClick}
           />
-          <div className="pointer-events-none absolute bottom-3 left-3 text-[11px] text-slate-400 bg-white/80 backdrop-blur-xs px-2.5 py-1 rounded-md border border-slate-200/60">
-            Drag to pan • Zoom with buttons • Click any point to cast search beam
+          <div className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-mono text-[#7E8794] bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded border border-[#E3DED6]">
+            Pan: Drag • Zoom: Controls • Reticle: Click node to cast distance calipers
           </div>
         </div>
       </div>
 
-      {/* Selected Vector & Nearest Neighbor Inspector */}
-      <div className="flex flex-col gap-5">
-        <div className="surface-card p-5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      {/* Target Specimen Inspector Panel */}
+      <div className="flex flex-col gap-4">
+        <div className="surface-card p-4 sm:p-5">
+          <div className="flex items-center justify-between border-b border-[#EBE7DF] pb-3">
             <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-indigo-600" />
-              <h3 className="text-sm font-semibold text-slate-900">Target Vector</h3>
+              <Crosshair className="h-4 w-4 text-[#0935B8]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-[#111315]">
+                Target Vector
+              </h3>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 font-medium">Top-K:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-[#7E8794] font-mono">TOP-K:</span>
               <select
                 value={kNearest}
                 onChange={(e) => setKNearest(Number(e.target.value))}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-indigo-500 shadow-xs"
+                className="rounded border border-[#DCD5C9] bg-white px-2 py-0.5 text-xs font-mono text-[#111315] focus:outline-none focus:border-[#0935B8] shadow-xs"
               >
                 <option value={2}>2</option>
                 <option value={3}>3</option>
@@ -348,70 +443,76 @@ export const SpaceExplorer: React.FC = () => {
           </div>
 
           {selectedPoint ? (
-            <div className="mt-4 space-y-4">
+            <div className="mt-3.5 space-y-3.5">
               <div>
-                <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Label</span>
-                <p className="text-base font-semibold text-slate-900 mt-0.5">{selectedPoint.metadata}</p>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#7E8794]">Label</span>
+                <p className="text-sm font-semibold text-[#111315] mt-0.5">{selectedPoint.metadata}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 text-xs">
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                  <span className="text-slate-500 text-[11px]">Category</span>
-                  <p className="mt-0.5 font-semibold text-indigo-700">{selectedPoint.category}</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded border border-[#E3DED6] bg-[#FAF9F7] p-2.5">
+                  <span className="text-[#7E8794] text-[10px] font-mono uppercase">Category</span>
+                  <p className="mt-0.5 font-semibold text-[#0935B8] text-xs">
+                    {selectedPoint.category}
+                  </p>
                 </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                  <span className="text-slate-500 text-[11px]">PCA Coordinates</span>
-                  <p className="mt-0.5 font-mono text-slate-700 font-medium">
-                    ({selectedPoint.x}, {selectedPoint.y})
+                <div className="rounded border border-[#E3DED6] bg-[#FAF9F7] p-2.5">
+                  <span className="text-[#7E8794] text-[10px] font-mono uppercase">PCA Coordinate</span>
+                  <p className="mt-0.5 font-mono text-[#111315] text-xs tabular-nums">
+                    [{selectedPoint.x}, {selectedPoint.y}]
                   </p>
                 </div>
               </div>
 
               {/* Nearest Neighbors List */}
-              <div className="pt-2">
-                <div className="mb-2.5 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-800">
-                    Nearest Neighbors in Space:
+              <div className="pt-1">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider font-mono text-[#555C68]">
+                    Nearest Neighbors:
                   </span>
-                  <Badge variant="indigo" size="xs">HNSW Cosine</Badge>
+                  <Badge variant="indigo" size="xs">COSINE</Badge>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {nearestNeighbors.map(({ point: np, dist }, idx) => (
                     <div
                       key={np.id}
                       onClick={() => setSelectedPoint(np)}
-                      className="group flex cursor-pointer items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 transition hover:border-indigo-200 hover:bg-indigo-50/50"
+                      className="group flex cursor-pointer items-center justify-between rounded border border-[#E3DED6] bg-[#FAF9F7] p-2 transition hover:border-[#0935B8] hover:bg-white"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-slate-200 text-[10px] font-mono text-slate-600 font-bold group-hover:border-indigo-300 group-hover:text-indigo-700">
-                          #{idx + 1}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-white border border-[#DCD5C9] text-[10px] font-mono text-[#555C68] font-bold group-hover:border-[#0935B8] group-hover:text-[#0935B8]">
+                          {idx + 1}
                         </span>
                         <div className="min-w-0 truncate">
-                          <p className="text-xs font-semibold text-slate-800 truncate group-hover:text-indigo-900">
+                          <p className="text-xs font-medium text-[#111315] truncate group-hover:text-[#0935B8]">
                             {np.metadata}
                           </p>
-                          <span className="text-[10px] text-slate-500">{np.category}</span>
+                          <span className="text-[10px] text-[#7E8794] font-mono">{np.category}</span>
                         </div>
                       </div>
-                      <span className="font-mono text-xs font-semibold text-indigo-600 shrink-0 ml-2">d={dist}</span>
+                      <span className="font-mono text-xs font-semibold text-[#0935B8] shrink-0 ml-2 tabular-nums">
+                        d={dist}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
           ) : (
-            <p className="mt-4 text-xs text-slate-400">Click any point on the radar to inspect.</p>
+            <p className="mt-4 text-xs text-[#7E8794] font-mono">Click any reticle on the manifold to inspect.</p>
           )}
         </div>
 
         {/* Algorithm Insight Card */}
-        <div className="surface-card p-5 bg-gradient-to-br from-indigo-50/50 via-white to-violet-50/30 border-indigo-100/70">
-          <div className="flex items-center gap-2 text-indigo-700 mb-2">
-            <Sparkles className="h-4 w-4" />
-            <h4 className="text-xs font-bold uppercase tracking-wider">Dimensionality Reduction</h4>
+        <div className="surface-card p-4 sm:p-5 border-l-2 border-l-[#0935B8]">
+          <div className="flex items-center gap-1.5 text-[#0935B8] mb-1.5">
+            <Sparkles className="h-3.5 w-3.5" />
+            <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider">
+              Dimensionality Reduction Spec
+            </h4>
           </div>
-          <p className="text-xs leading-relaxed text-slate-600">
-            The original vectors live in a <strong className="text-slate-900 font-semibold">16-dimensional</strong> semantic space. Principal Component Analysis (PCA) projects these hyper-dimensional clusters onto a 2D plane while preserving the maximum variance of cosine angles.
+          <p className="text-xs leading-relaxed text-[#555C68]">
+            The original vectors occupy a <strong className="text-[#111315] font-semibold">16-dimensional</strong> mathematical manifold. Principal Component Analysis (PCA) projects these hyper-dimensional embeddings onto a 2D plane by computing the principal eigenvectors of the covariance matrix, preserving maximal angular variance.
           </p>
         </div>
       </div>

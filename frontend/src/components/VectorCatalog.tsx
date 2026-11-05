@@ -112,30 +112,34 @@ export const VectorCatalog: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       {/* Controls Bar */}
-      <div className="surface-card p-5">
+      <div className="surface-card p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600">
-              <Database className="h-5 w-5" />
+            <div className="flex h-9 w-9 items-center justify-center rounded bg-[#111315] text-[#EEF3FF] shadow-xs">
+              <Database className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Indexed Vector Registry</h2>
-              <p className="text-xs text-slate-500">Manage 16D semantic vectors and ground truth records</p>
+              <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-[#111315]">
+                Vector Embedding Registry
+              </h2>
+              <p className="text-xs text-[#555C68] font-sans">
+                Browse, filter, and inspect high-dimensional semantic coordinates
+              </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Search Input */}
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-xs focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500/20">
-              <Search className="h-3.5 w-3.5 text-slate-400" />
+            <div className="flex items-center gap-2 rounded border border-[#DCD5C9] bg-white px-2.5 py-1 text-xs shadow-xs focus-within:border-[#0935B8]">
+              <Search className="h-3.5 w-3.5 text-[#7E8794]" />
               <input
                 type="text"
-                placeholder="Search vectors..."
+                placeholder="Filter vectors..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-transparent text-slate-800 placeholder-slate-400 focus:outline-none w-36 sm:w-48 text-xs"
+                className="bg-transparent text-[#111315] placeholder-[#7E8794] focus:outline-none w-32 sm:w-44 text-xs font-sans"
               />
             </div>
 
@@ -143,7 +147,7 @@ export const VectorCatalog: React.FC = () => {
             <select
               value={filterCat}
               onChange={(e) => setFilterCat(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:border-indigo-500 shadow-xs"
+              className="rounded border border-[#DCD5C9] bg-white px-2.5 py-1 text-xs font-mono text-[#111315] focus:outline-none focus:border-[#0935B8] shadow-xs cursor-pointer"
             >
               <option value="All">All Categories</option>
               <option value="Computer Science">Computer Science</option>
@@ -153,13 +157,13 @@ export const VectorCatalog: React.FC = () => {
             </select>
 
             {/* View Mode Switcher */}
-            <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+            <div className="flex items-center p-0.5 bg-[#EDEAE3] rounded border border-[#E1DBD0]">
               <button
                 onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-md text-xs transition ${
+                className={`p-1 rounded text-xs transition ${
                   viewMode === "table"
-                    ? "bg-white text-indigo-600 shadow-xs font-semibold"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-white text-[#0935B8] shadow-xs font-bold"
+                    : "text-[#555C68] hover:text-[#111315]"
                 }`}
                 title="Table View"
               >
@@ -167,10 +171,10 @@ export const VectorCatalog: React.FC = () => {
               </button>
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-md text-xs transition ${
+                className={`p-1 rounded text-xs transition ${
                   viewMode === "grid"
-                    ? "bg-white text-indigo-600 shadow-xs font-semibold"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-white text-[#0935B8] shadow-xs font-bold"
+                    : "text-[#555C68] hover:text-[#111315]"
                 }`}
                 title="Grid View"
               >
@@ -185,7 +189,7 @@ export const VectorCatalog: React.FC = () => {
               onClick={() => setShowAddModal(true)}
               icon={<Plus className="h-3.5 w-3.5" />}
             >
-              Add Vector
+              ADD VECTOR
             </Button>
           </div>
         </div>
@@ -194,11 +198,15 @@ export const VectorCatalog: React.FC = () => {
       {/* Main Content: Table or Grid */}
       {filtered.length === 0 ? (
         <EmptyState
-          icon={<Database className="h-6 w-6" />}
-          title="No vectors found"
-          description={search ? `No vectors matching "${search}" in category "${filterCat}".` : "Your vector index is currently empty."}
+          icon={<Database className="h-5 w-5" />}
+          title="No vectors matching filter"
+          description={
+            search
+              ? `No vectors matching "${search}" in category "${filterCat}".`
+              : "Your vector index is currently empty."
+          }
           action={{
-            label: "Add New Vector",
+            label: "Register Vector",
             onClick: () => setShowAddModal(true),
             icon: <Plus className="h-3.5 w-3.5" />,
           }}
@@ -206,26 +214,26 @@ export const VectorCatalog: React.FC = () => {
       ) : viewMode === "table" ? (
         <div className="surface-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600">
-              <thead className="border-b border-slate-100 bg-slate-50/70 text-[11px] uppercase text-slate-400 font-semibold">
+            <table className="w-full text-left text-xs text-[#555C68]">
+              <thead className="border-b border-[#E3DED6] bg-[#FAF9F7] text-[10px] uppercase font-mono text-[#7E8794]">
                 <tr>
-                  <th className="px-5 py-3.5">ID</th>
-                  <th className="px-5 py-3.5">Label / Concept</th>
-                  <th className="px-5 py-3.5">Category</th>
-                  <th className="px-5 py-3.5">16D Embedding Spectrum</th>
-                  <th className="px-5 py-3.5 text-right">Actions</th>
+                  <th className="px-4 py-3 font-semibold">ID</th>
+                  <th className="px-4 py-3 font-semibold">Vector Concept</th>
+                  <th className="px-4 py-3 font-semibold">Category</th>
+                  <th className="px-4 py-3 font-semibold">16D Embedding Spectrum</th>
+                  <th className="px-4 py-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#EBE7DF]">
                 {filtered.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/70 transition">
-                    <td className="px-5 py-3 font-mono font-bold text-indigo-600">
+                  <tr key={item.id} className="hover:bg-[#FAF9F7] transition">
+                    <td className="px-4 py-2.5 font-mono font-bold text-[#0935B8] tabular-nums">
                       #{item.id}
                     </td>
-                    <td className="px-5 py-3 font-semibold text-slate-900">
+                    <td className="px-4 py-2.5 font-semibold text-[#111315]">
                       {item.metadata}
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-4 py-2.5">
                       <Badge
                         variant={categoryBadgeVariant[item.category] || "slate"}
                         size="xs"
@@ -233,38 +241,38 @@ export const VectorCatalog: React.FC = () => {
                         {item.category}
                       </Badge>
                     </td>
-                    <td className="px-5 py-3">
-                      {/* Mini Heatmap Strip */}
+                    <td className="px-4 py-2.5">
+                      {/* Mini Heatmap Strip in Deep Cobalt */}
                       <div className="flex items-center gap-0.5 max-w-[200px]" title="16D Float Coordinates">
                         {item.embedding?.slice(0, 16).map((val, idx) => {
-                          const opacity = Math.min(Math.max(val, 0.1), 1);
+                          const opacity = Math.min(Math.max(val, 0.12), 1);
                           return (
                             <span
                               key={idx}
                               className="h-4 w-2 rounded-xs transition-opacity"
                               style={{
-                                backgroundColor: `rgba(99, 102, 241, ${opacity})`,
+                                backgroundColor: `rgba(9, 53, 184, ${opacity})`,
                               }}
                             />
                           );
                         })}
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="px-4 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => setSelectedVec(item)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                          className="p-1 rounded text-[#7E8794] hover:text-[#0935B8] hover:bg-[#EEF3FF] transition"
                           title="Inspect Vector"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                          className="p-1 rounded text-[#7E8794] hover:text-[#BE123C] hover:bg-[#FFF1F2] transition"
                           title="Delete Vector"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>
@@ -280,11 +288,11 @@ export const VectorCatalog: React.FC = () => {
           {filtered.map((item) => (
             <div
               key={item.id}
-              className="surface-card p-5 flex flex-col justify-between hover:border-slate-300 transition-all hover:shadow-cardHover"
+              className="surface-card p-4 flex flex-col justify-between hover:border-[#0935B8] transition-all"
             >
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-mono text-xs font-bold text-indigo-600">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-mono text-xs font-bold text-[#0935B8] tabular-nums">
                     #{item.id}
                   </span>
                   <Badge
@@ -294,24 +302,24 @@ export const VectorCatalog: React.FC = () => {
                     {item.category}
                   </Badge>
                 </div>
-                <h3 className="font-semibold text-slate-900 text-sm mb-3">
+                <h3 className="font-semibold text-[#111315] text-xs mb-2.5">
                   {item.metadata}
                 </h3>
 
                 {/* Heatmap visualization */}
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-3">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block mb-1.5">
-                    16D Heatmap
+                <div className="bg-[#FAF9F7] p-2 rounded border border-[#E3DED6] mb-2.5">
+                  <span className="text-[9px] text-[#7E8794] uppercase font-mono block mb-1">
+                    16D Heatmap Spectrum
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     {item.embedding?.slice(0, 16).map((val, idx) => {
                       const opacity = Math.min(Math.max(val, 0.15), 1);
                       return (
                         <div
                           key={idx}
-                          className="h-6 flex-1 rounded-xs"
+                          className="h-5 flex-1 rounded-xs"
                           style={{
-                            backgroundColor: `rgba(99, 102, 241, ${opacity})`,
+                            backgroundColor: `rgba(9, 53, 184, ${opacity})`,
                           }}
                           title={`dim_${idx}: ${val}`}
                         />
@@ -321,18 +329,18 @@ export const VectorCatalog: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-1 pt-2 border-t border-[#EBE7DF]">
                 <Button
                   size="xs"
                   variant="ghost"
                   onClick={() => setSelectedVec(item)}
-                  icon={<Eye className="h-3.5 w-3.5" />}
+                  icon={<Eye className="h-3 w-3" />}
                 >
                   Inspect
                 </Button>
                 <button
                   onClick={() => handleDelete(item.id)}
-                  className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                  className="p-1 rounded text-[#7E8794] hover:text-[#BE123C] hover:bg-[#FFF1F2] transition"
                   title="Delete"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -345,48 +353,50 @@ export const VectorCatalog: React.FC = () => {
 
       {/* Vector Detail Modal */}
       {selectedVec && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="surface-card w-full max-w-lg p-6 shadow-elevation">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#111315]/30 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="surface-card w-full max-w-lg p-5 shadow-elevation">
+            <div className="flex items-center justify-between border-b border-[#E3DED6] pb-3">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold font-mono text-xs">
+                <div className="h-7 w-7 rounded bg-[#EEF3FF] border border-[#CFDEFE] flex items-center justify-center text-[#0935B8] font-bold font-mono text-xs">
                   #{selectedVec.id}
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-sm">Vector Inspection</h3>
-                  <p className="text-xs text-slate-400">{selectedVec.category}</p>
+                  <h3 className="font-bold text-[#111315] text-xs font-mono uppercase tracking-wider">
+                    Vector Specimen Inspection
+                  </h3>
+                  <p className="text-[11px] text-[#7E8794] font-mono">{selectedVec.category}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedVec(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                className="p-1 rounded text-[#7E8794] hover:text-[#111315] hover:bg-[#EDEAE3] transition"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            <div className="mt-4 space-y-4 text-xs">
+            <div className="mt-3.5 space-y-3 text-xs">
               <div>
-                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Concept Label</span>
-                <p className="text-sm font-semibold text-slate-800 mt-0.5">{selectedVec.metadata}</p>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#7E8794]">Concept Label</span>
+                <p className="text-xs font-semibold text-[#111315] mt-0.5">{selectedVec.metadata}</p>
               </div>
 
               <div>
-                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider block mb-2">
-                  Full 16D Float Coordinates
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#7E8794] block mb-1.5">
+                  16-Dimensional Coordinates Array
                 </span>
-                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 font-mono text-slate-700 text-[11px] grid grid-cols-4 gap-2">
+                <div className="bg-[#FAF9F7] p-3 rounded border border-[#E3DED6] font-mono text-[#111315] text-[11px] grid grid-cols-4 gap-1.5 tabular-nums">
                   {selectedVec.embedding.map((val, i) => (
-                    <div key={i} className="bg-white p-1.5 rounded-md border border-slate-200/60 shadow-2xs">
-                      <span className="text-[9px] text-slate-400 block font-sans">d{i}</span>
-                      <span className="font-bold text-indigo-600">{val}</span>
+                    <div key={i} className="bg-white p-1 rounded border border-[#E3DED6] shadow-2xs">
+                      <span className="text-[9px] text-[#7E8794] block font-mono">d{i}</span>
+                      <span className="font-bold text-[#0935B8]">{val}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 pt-3 border-t border-slate-100 flex justify-end">
+            <div className="mt-4 pt-2.5 border-t border-[#E3DED6] flex justify-end">
               <Button size="sm" variant="secondary" onClick={() => setSelectedVec(null)}>
                 Close
               </Button>
@@ -397,44 +407,48 @@ export const VectorCatalog: React.FC = () => {
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="surface-card w-full max-w-md p-6 shadow-elevation">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#111315]/30 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="surface-card w-full max-w-md p-5 shadow-elevation">
+            <div className="flex items-center justify-between border-b border-[#E3DED6] pb-3">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                <div className="h-7 w-7 rounded bg-[#EEF3FF] border border-[#CFDEFE] flex items-center justify-center text-[#0935B8]">
                   <Plus className="h-4 w-4" />
                 </div>
-                <h3 className="font-bold text-slate-900 text-sm">Add New Vector</h3>
+                <h3 className="font-bold text-[#111315] text-xs font-mono uppercase tracking-wider">
+                  Register New Vector
+                </h3>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                className="p-1 rounded text-[#7E8794] hover:text-[#111315] hover:bg-[#EDEAE3] transition"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            <form onSubmit={handleAdd} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleAdd} className="mt-3.5 space-y-3 text-xs">
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  Vector Label / Description
+                <label className="block text-[#111315] font-mono text-[10px] font-bold uppercase tracking-wider mb-1">
+                  Vector Description / Label
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Graph Convolutional Networks"
+                  placeholder="e.g. Graph Neural Networks & Message Passing"
                   value={newMeta}
                   onChange={(e) => setNewMeta(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 focus:outline-none"
+                  className="w-full rounded border border-[#DCD5C9] bg-white px-3 py-1.5 text-xs text-[#111315] placeholder-[#7E8794] focus:border-[#0935B8] focus:outline-none"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Category</label>
+                <label className="block text-[#111315] font-mono text-[10px] font-bold uppercase tracking-wider mb-1">
+                  Category
+                </label>
                 <select
                   value={newCat}
                   onChange={(e) => setNewCat(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:border-indigo-500 focus:outline-none"
+                  className="w-full rounded border border-[#DCD5C9] bg-white px-3 py-1.5 text-xs text-[#111315] focus:border-[#0935B8] focus:outline-none cursor-pointer"
                 >
                   <option value="Computer Science">Computer Science</option>
                   <option value="Mathematics">Mathematics</option>
@@ -443,7 +457,7 @@ export const VectorCatalog: React.FC = () => {
                 </select>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+              <div className="pt-2.5 border-t border-[#E3DED6] flex justify-end gap-2">
                 <Button
                   type="button"
                   variant="secondary"
@@ -453,7 +467,7 @@ export const VectorCatalog: React.FC = () => {
                   Cancel
                 </Button>
                 <Button type="submit" variant="primary" size="sm">
-                  Insert into HNSW
+                  INSERT INTO HNSW
                 </Button>
               </div>
             </form>

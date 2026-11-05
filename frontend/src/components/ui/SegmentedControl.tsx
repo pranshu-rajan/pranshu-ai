@@ -27,7 +27,7 @@ export function SegmentedControl<T extends string | number>({
   return (
     <div
       role="tablist"
-      className={`inline-flex p-1 bg-slate-100/80 rounded-xl border border-slate-200/60 select-none ${className}`}
+      className={`inline-flex p-0.5 bg-[#EDEAE3] rounded-md border border-[#E1DBD0] shadow-[inset_0_1px_2px_rgba(17,19,21,0.05)] select-none ${className}`}
     >
       {options.map((option) => {
         const isSelected = option.value === value;
@@ -37,20 +37,20 @@ export function SegmentedControl<T extends string | number>({
             role="tab"
             aria-selected={isSelected}
             onClick={() => onChange(option.value)}
-            className={`relative flex items-center justify-center font-medium rounded-lg transition-all duration-200 outline-none ${
+            className={`relative flex items-center justify-center font-medium rounded transition-all duration-150 outline-none ${
               isSm
-                ? "px-2.5 py-1 text-xs gap-1.5"
-                : "px-3.5 py-1.5 text-xs gap-2"
+                ? "px-2.5 py-1 text-[11px] gap-1.5"
+                : "px-3 py-1.5 text-xs gap-2"
             } ${
               isSelected
-                ? "bg-white text-slate-900 shadow-sm font-semibold"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                ? "bg-white text-[#111315] shadow-[0_1px_2px_rgba(17,19,21,0.06),inset_0_1px_0_rgba(255,255,255,1)] border border-[#DCD5C9] font-semibold"
+                : "text-[#555C68] hover:text-[#111315] hover:bg-[#E5E1D8]/60 border border-transparent"
             }`}
           >
             {option.icon && (
               <span
                 className={`transition-colors shrink-0 ${
-                  isSelected ? "text-indigo-600" : "text-slate-400"
+                  isSelected ? "text-[#0935B8]" : "text-[#7E8794]"
                 }`}
               >
                 {option.icon}
@@ -66,4 +66,3 @@ export function SegmentedControl<T extends string | number>({
 }
 
 export default SegmentedControl;
-

@@ -6,13 +6,13 @@ import { runBenchmark } from "../lib/api";
 import {
   Activity,
   Gauge,
-  Flame,
   Clock,
   Sliders,
   CheckCircle2,
   TrendingDown,
   Award,
   Layers,
+  Cpu,
 } from "lucide-react";
 import Button from "./ui/Button";
 import Badge from "./ui/Badge";
@@ -46,33 +46,33 @@ export const BenchmarkArena: React.FC = () => {
       : "1.0";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       {/* Top Controls Bar */}
-      <div className="surface-card p-5">
+      <div className="surface-card p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600">
-              <Activity className="h-5 w-5" />
+            <div className="flex h-9 w-9 items-center justify-center rounded bg-[#111315] text-[#EEF3FF] shadow-xs">
+              <Activity className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">
+              <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-[#111315]">
                 Vector Search Benchmark Arena
               </h2>
-              <p className="text-xs text-slate-500">
-                Real-time latency evaluation: Brute Force O(N) vs KD-Tree O(log N) vs HNSW O(log N)
+              <p className="text-xs text-[#555C68] font-sans">
+                Real-time microsecond telemetry: Brute Force O(N) vs KD-Tree O(log N) vs HNSW O(log N)
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             {/* Top-K Select */}
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-xs">
-              <Sliders className="h-3.5 w-3.5 text-slate-400" />
-              <span className="text-slate-500 font-medium">Top-K:</span>
+            <div className="flex items-center gap-1.5 rounded border border-[#DCD5C9] bg-white px-2.5 py-1 text-xs font-mono shadow-xs">
+              <Sliders className="h-3 w-3 text-[#7E8794]" />
+              <span className="text-[#7E8794] text-[11px] uppercase">K:</span>
               <select
                 value={kVal}
                 onChange={(e) => setKVal(Number(e.target.value))}
-                className="bg-transparent font-semibold text-slate-800 focus:outline-none"
+                className="bg-transparent font-semibold text-[#111315] focus:outline-none cursor-pointer"
               >
                 <option value={1}>1</option>
                 <option value={3}>3</option>
@@ -83,12 +83,12 @@ export const BenchmarkArena: React.FC = () => {
             </div>
 
             {/* Metric Select */}
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-xs">
-              <span className="text-slate-500 font-medium">Metric:</span>
+            <div className="flex items-center gap-1.5 rounded border border-[#DCD5C9] bg-white px-2.5 py-1 text-xs font-mono shadow-xs">
+              <span className="text-[#7E8794] text-[11px] uppercase">Metric:</span>
               <select
                 value={metric}
                 onChange={(e) => setMetric(e.target.value)}
-                className="bg-transparent font-semibold text-indigo-600 focus:outline-none"
+                className="bg-transparent font-semibold text-[#0935B8] focus:outline-none cursor-pointer"
               >
                 <option value="cosine">Cosine</option>
                 <option value="euclidean">Euclidean</option>
@@ -102,34 +102,36 @@ export const BenchmarkArena: React.FC = () => {
               size="md"
               onClick={executeBenchmark}
               loading={loading}
-              icon={<Gauge className="h-4 w-4" />}
+              icon={<Gauge className="h-3.5 w-3.5" />}
             >
-              {loading ? "Running 50 Iterations..." : "Run Benchmark"}
+              {loading ? "EXECUTING (50 ITER)..." : "RUN BENCHMARK"}
             </Button>
           </div>
         </div>
       </div>
 
       {/* Latency Comparison Cards */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Brute Force */}
-        <div className="surface-card p-5 relative overflow-hidden">
+        <div className="surface-card p-4 sm:p-5 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-[#555C68] uppercase tracking-wider font-mono">
               Brute Force Flat
             </span>
             <Badge variant="slate" size="xs">O(N)</Badge>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold font-mono text-slate-800">
+          <div className="mt-2.5 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-bold font-mono text-[#111315] tabular-nums">
               {result?.bruteforceUs ?? "--"}
             </span>
-            <span className="text-xs font-mono text-slate-400 font-semibold">μs</span>
+            <span className="text-xs font-mono text-[#7E8794]">μs</span>
           </div>
-          <p className="mt-2 text-xs text-slate-500">Exhaustive linear distance computation.</p>
-          <div className="mt-4 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+          <p className="mt-1 text-[11px] text-[#7E8794] font-sans">
+            Exhaustive linear distance scan across all vectors.
+          </p>
+          <div className="mt-3.5 h-1.5 w-full rounded bg-[#EDEAE3] overflow-hidden">
             <div
-              className="h-full bg-slate-400 transition-all duration-700 rounded-full"
+              className="h-full bg-[#7E8794] transition-all duration-500 rounded"
               style={{
                 width: result ? `${(result.bruteforceUs / maxUs) * 100}%` : "50%",
               }}
@@ -138,23 +140,25 @@ export const BenchmarkArena: React.FC = () => {
         </div>
 
         {/* KD-Tree */}
-        <div className="surface-card p-5 relative overflow-hidden">
+        <div className="surface-card p-4 sm:p-5 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-teal-700 uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-[#0D5F52] uppercase tracking-wider font-mono">
               KD-Tree
             </span>
             <Badge variant="emerald" size="xs">O(log N)</Badge>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold font-mono text-slate-800">
+          <div className="mt-2.5 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-bold font-mono text-[#111315] tabular-nums">
               {result?.kdtreeUs ?? "--"}
             </span>
-            <span className="text-xs font-mono text-slate-400 font-semibold">μs</span>
+            <span className="text-xs font-mono text-[#7E8794]">μs</span>
           </div>
-          <p className="mt-2 text-xs text-slate-500">Orthogonal hyperplane bounding pruning.</p>
-          <div className="mt-4 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+          <p className="mt-1 text-[11px] text-[#7E8794] font-sans">
+            Orthogonal hyper-plane bounding tree pruning.
+          </p>
+          <div className="mt-3.5 h-1.5 w-full rounded bg-[#EDEAE3] overflow-hidden">
             <div
-              className="h-full bg-teal-500 transition-all duration-700 rounded-full"
+              className="h-full bg-[#0D5F52] transition-all duration-500 rounded"
               style={{
                 width: result ? `${(result.kdtreeUs / maxUs) * 100}%` : "30%",
               }}
@@ -163,30 +167,30 @@ export const BenchmarkArena: React.FC = () => {
         </div>
 
         {/* HNSW Winner Card */}
-        <div className="surface-card p-5 relative overflow-hidden border-indigo-200/90 bg-gradient-to-br from-white via-white to-indigo-50/40 shadow-sm shadow-indigo-100">
+        <div className="surface-card p-4 sm:p-5 relative overflow-hidden border-[#0935B8]/40 border-l-3 border-l-[#0935B8]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <Award className="h-4 w-4 text-indigo-600" />
-              <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">
-                HNSW (Production)
+              <Award className="h-3.5 w-3.5 text-[#0935B8]" />
+              <span className="text-[10px] font-bold text-[#0935B8] uppercase tracking-wider font-mono">
+                HNSW (High-Dim)
               </span>
             </div>
             <Badge variant="indigo" size="xs">
-              {hnswSpeedup}x Faster
+              {hnswSpeedup}x FASTER
             </Badge>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold font-mono text-indigo-600">
+          <div className="mt-2.5 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-bold font-mono text-[#0935B8] tabular-nums">
               {result?.hnswUs ?? "--"}
             </span>
-            <span className="text-xs font-mono text-indigo-400 font-semibold">μs</span>
+            <span className="text-xs font-mono text-[#5D94FA]">μs</span>
           </div>
-          <p className="mt-2 text-xs text-slate-600">
-            Multi-layer skip-list small world graph navigation.
+          <p className="mt-1 text-[11px] text-[#555C68] font-sans">
+            Multi-layer navigable small-world expressways.
           </p>
-          <div className="mt-4 h-2 w-full rounded-full bg-indigo-100 overflow-hidden">
+          <div className="mt-3.5 h-1.5 w-full rounded bg-[#EDEAE3] overflow-hidden">
             <div
-              className="h-full bg-indigo-600 transition-all duration-700 rounded-full shadow-xs"
+              className="h-full bg-[#0935B8] transition-all duration-500 rounded"
               style={{
                 width: result ? `${Math.max((result.hnswUs / maxUs) * 100, 6)}%` : "20%",
               }}
@@ -195,29 +199,35 @@ export const BenchmarkArena: React.FC = () => {
         </div>
       </div>
 
-      {/* History Trend if multiple runs */}
+      {/* History Telemetry Runs */}
       {history.length > 1 && (
         <div className="surface-card p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-700">Recent Benchmark Runs</span>
-            <span className="text-[11px] text-slate-400 font-mono">Last {history.length} iterations</span>
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#555C68]">
+              Recent Telemetry Iterations
+            </span>
+            <span className="text-[10px] text-[#7E8794] font-mono tabular-nums">
+              Last {history.length} runs
+            </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
             {history.map((h, i) => (
               <div
                 key={i}
-                className={`p-2.5 rounded-xl border text-xs font-mono ${
+                className={`p-2 rounded border text-xs font-mono ${
                   i === 0
-                    ? "bg-indigo-50/70 border-indigo-200 text-indigo-900"
-                    : "bg-slate-50 border-slate-200/80 text-slate-600"
+                    ? "bg-[#EEF3FF] border-[#CFDEFE] text-[#0935B8]"
+                    : "bg-[#FAF9F7] border-[#E3DED6] text-[#555C68]"
                 }`}
               >
-                <div className="text-[10px] text-slate-400 mb-1">Run #{history.length - i}</div>
-                <div className="flex justify-between text-[11px]">
+                <div className="text-[9px] text-[#7E8794] mb-0.5 font-mono uppercase">
+                  Run #{history.length - i}
+                </div>
+                <div className="flex justify-between text-[11px] tabular-nums">
                   <span>HNSW:</span>
                   <span className="font-bold">{h.hnswUs}μs</span>
                 </div>
-                <div className="flex justify-between text-[11px] text-slate-500">
+                <div className="flex justify-between text-[10px] text-[#7E8794] tabular-nums">
                   <span>Flat:</span>
                   <span>{h.bruteforceUs}μs</span>
                 </div>
@@ -228,47 +238,51 @@ export const BenchmarkArena: React.FC = () => {
       )}
 
       {/* Algorithmic Complexity Breakdown */}
-      <div className="surface-card p-6">
-        <h3 className="text-sm font-bold text-slate-900 mb-4">Algorithmic Trade-Off Matrix</h3>
+      <div className="surface-card p-4 sm:p-5">
+        <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-[#111315] mb-3">
+          Algorithmic Complexity & Hardware Trade-Off Matrix
+        </h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600">
-            <thead className="border-b border-slate-100 text-[11px] text-slate-400 uppercase">
+          <table className="w-full text-left text-xs text-[#555C68]">
+            <thead className="border-b border-[#E3DED6] text-[10px] font-mono text-[#7E8794] uppercase tracking-wider">
               <tr>
-                <th className="pb-3 font-semibold">Algorithm</th>
-                <th className="pb-3 font-semibold">Query Complexity</th>
-                <th className="pb-3 font-semibold">Build Complexity</th>
-                <th className="pb-3 font-semibold">High-Dim Robustness</th>
-                <th className="pb-3 font-semibold">Production Fit</th>
+                <th className="pb-2.5 font-semibold">Algorithm</th>
+                <th className="pb-2.5 font-semibold">Search Complexity</th>
+                <th className="pb-2.5 font-semibold">Build Index Complexity</th>
+                <th className="pb-2.5 font-semibold">Curse of Dimensionality</th>
+                <th className="pb-2.5 font-semibold">Production Architecture</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              <tr className="hover:bg-slate-50/60 transition">
-                <td className="py-3.5 font-semibold text-slate-800">Brute Force</td>
-                <td className="py-3.5 font-mono text-slate-700">O(N • D)</td>
-                <td className="py-3.5 font-mono text-slate-700">O(1)</td>
-                <td className="py-3.5">
-                  <Badge variant="emerald" size="xs">Exact 100% Recall</Badge>
+            <tbody className="divide-y divide-[#EBE7DF]">
+              <tr className="hover:bg-[#FAF9F7] transition">
+                <td className="py-2.5 font-semibold text-[#111315]">Brute Force Flat</td>
+                <td className="py-2.5 font-mono text-[#111315]">O(N • D)</td>
+                <td className="py-2.5 font-mono text-[#7E8794]">O(1)</td>
+                <td className="py-2.5">
+                  <Badge variant="emerald" size="xs">EXACT 100% RECALL</Badge>
                 </td>
-                <td className="py-3.5 text-slate-400">Small Datasets (&lt;10k)</td>
+                <td className="py-2.5 text-[#7E8794] font-mono text-[11px]">Small Datasets (&lt;10k items)</td>
               </tr>
-              <tr className="hover:bg-slate-50/60 transition">
-                <td className="py-3.5 font-semibold text-teal-700">KD-Tree</td>
-                <td className="py-3.5 font-mono text-slate-700">O(2^D • log N)</td>
-                <td className="py-3.5 font-mono text-slate-700">O(N • log N)</td>
-                <td className="py-3.5">
-                  <Badge variant="amber" size="xs">Degrades when D &gt; 10</Badge>
+              <tr className="hover:bg-[#FAF9F7] transition">
+                <td className="py-2.5 font-semibold text-[#0D5F52]">KD-Tree</td>
+                <td className="py-2.5 font-mono text-[#111315]">O(2^D • log N)</td>
+                <td className="py-2.5 font-mono text-[#7E8794]">O(N • log N)</td>
+                <td className="py-2.5">
+                  <Badge variant="amber" size="xs">DEGRADES WHEN D &gt; 10</Badge>
                 </td>
-                <td className="py-3.5 text-slate-500">Low-Dim Geospatial (2D/3D)</td>
+                <td className="py-2.5 text-[#555C68] font-mono text-[11px]">Geospatial / 2D / 3D Spatial Maps</td>
               </tr>
-              <tr className="hover:bg-indigo-50/40 transition">
-                <td className="py-3.5 font-bold text-indigo-700">HNSW</td>
-                <td className="py-3.5 font-mono font-semibold text-indigo-600">O(log N)</td>
-                <td className="py-3.5 font-mono text-slate-700">O(N • log N)</td>
-                <td className="py-3.5">
-                  <Badge variant="indigo" size="xs">Exceptional (768D+)</Badge>
+              <tr className="hover:bg-[#EEF3FF]/40 transition">
+                <td className="py-2.5 font-bold text-[#0935B8]">HNSW Graph</td>
+                <td className="py-2.5 font-mono font-bold text-[#0935B8]">O(log N)</td>
+                <td className="py-2.5 font-mono text-[#7E8794]">O(N • log N)</td>
+                <td className="py-2.5">
+                  <Badge variant="indigo" size="xs">EXCEPTIONAL (768D+)</Badge>
                 </td>
-                <td className="py-3.5">
-                  <span className="font-semibold text-indigo-700">Pinecone / Weaviate / Chroma</span>
+                <td className="py-2.5">
+                  <span className="font-semibold text-[#0935B8] font-mono text-[11px]">
+                    Production Standard (Pinecone / Weaviate / Chroma)
+                  </span>
                 </td>
               </tr>
             </tbody>
