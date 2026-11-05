@@ -34,12 +34,17 @@ ENV/
 data/
 uploads/
 
-# Environment variables
+# Environment variables (STRICTLY UNTRACKED)
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+**/.env
+**/.env.*
+**/.env.local
+!**/.env.example
 
 # C++ Build outputs
 *.exe
