@@ -8,12 +8,18 @@ from app.models.schemas import (
     VectorInsertRequest, VectorSearchRequest, VectorSearchResult,
     BenchmarkRequest, BenchmarkResponse, HnswGraphResponse,
     PcaResponse, DocumentUploadRequest, DocumentItem,
-    RagQueryRequest, RagResponse, StatusResponse
+    RagQueryRequest, RagResponse, StatusResponse,
+    GuardrailCheckRequest, GuardrailCheckResponse,
+    ObservabilityTraceSchema, RagasEvalResponse
 )
 from app.engine.vector_engine import vector_engine
 from app.rag.advanced_rag import rag_pipeline
 from app.rag.llm_client import llm_client
 from app.db.database import get_all_documents, delete_document, record_chat, get_doc_count
+from app.security.guardrails import guardrail_engine
+from app.observability.tracer import tracer
+from app.gateway.resilience import llm_gateway
+from app.evals.ragas_evals import ragas_evaluator
 
 router = APIRouter()
 
@@ -190,18 +196,53 @@ async def benchmark_rerank(query: str = "HNSW search algorithm complexity"):
 @router.post("/rag/ask")
 async def ask_rag(req: RagQueryRequest):
     t0 = time.perf_counter()
-    
-    # 1. Advanced Context Retrieval with Selected Re-Ranker Mode
-    contexts, hyde_passage = await rag_pipeline.retrieve(
-        question=req.question,
-        k=req.k,
-        use_hybrid=req.use_hybrid,
-        use_rerank=req.use_rerank,
-        use_hyde=req.use_hyde,
-        rerank_mode=req.rerank_mode or "ensemble"
-    )
+    trace = tracer.start_trace(name="rag_ask", query=req.question)
 
-    # 2. Build Prompt
+    # 1. Enterprise Security Guardrails Gate
+    with trace.span("guardrail_gate", {"raw_chars": len(req.question)}) as s_guard:
+        guard_res = guardrail_engine.evaluate(req.question)
+        s_guard.set_attribute("action", guard_res.action)
+        s_guard.set_attribute("threat_level", guard_res.threat_level)
+        s_guard.set_attribute("flagged_categories", guard_res.flagged_categories)
+
+    provider, active_model = await llm_client.get_active_provider_info()
+
+    # Blocked Request: Fail-closed with security alert
+    if not guard_res.is_safe:
+        tracer.end_trace(trace, status="blocked")
+        refusal_msg = guard_res.refusal_message or "Security Violation: Query quarantined by safety guardrails."
+        
+        if req.stream:
+            async def blocked_stream():
+                yield f"data: {json.dumps({'type': 'meta', 'contexts': [], 'confidence': 'low', 'model': active_model, 'provider': provider, 'security_alert': guard_res.flagged_categories, 'action': 'blocked'})}\n\n"
+                yield f"data: {json.dumps({'type': 'token', 'token': f'[🛡️ SECURITY GUARDRAIL INTERCEPT: {guard_res.threat_level.upper()}]\n\n{refusal_msg}'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'latency_ms': round((time.perf_counter() - t0) * 1000, 1), 'model': active_model, 'provider': provider})}\n\n"
+            return StreamingResponse(blocked_stream(), media_type="text/event-stream")
+
+        return RagResponse(
+            answer=f"[🛡️ SECURITY GUARDRAIL INTERCEPT: {guard_res.threat_level.upper()}]\n\n{refusal_msg}",
+            model=active_model,
+            provider=provider,
+            latency_ms=round((time.perf_counter() - t0) * 1000, 1),
+            contexts=[],
+            docCount=await get_doc_count()
+        )
+
+    effective_query = guard_res.sanitized_text
+
+    # 2. Advanced Context Retrieval with Selected Re-Ranker Mode
+    with trace.span("retrieval_pipeline", {"mode": req.rerank_mode, "k": req.k}) as s_ret:
+        contexts, hyde_passage = await rag_pipeline.retrieve(
+            question=effective_query,
+            k=req.k,
+            use_hybrid=req.use_hybrid,
+            use_rerank=req.use_rerank,
+            use_hyde=req.use_hyde,
+            rerank_mode=req.rerank_mode or "ensemble"
+        )
+        s_ret.set_attribute("contexts_retrieved", len(contexts))
+
+    # 3. Build Prompt
     ctx_str = ""
     for i, c in enumerate(contexts):
         ctx_str += f"[{i + 1}] {c.get('title', 'Document')}:\n{c.get('text', '')}\n\n"
@@ -218,11 +259,9 @@ async def ask_rag(req: RagQueryRequest):
 
     full_prompt = (
         f"Context Chunks (Retrieval Confidence: {retrieval_confidence.upper()}):\n{ctx_str}\n\n"
-        f"User Question: {req.question}\n\n"
+        f"User Question: {effective_query}\n\n"
         f"Direct Answer:"
     )
-
-    provider, active_model = await llm_client.get_active_provider_info()
 
     if req.stream:
         async def event_generator():
@@ -233,32 +272,50 @@ async def ask_rag(req: RagQueryRequest):
                 "hyde_passage": hyde_passage,
                 "confidence": retrieval_confidence,
                 "model": active_model,
-                "provider": provider
+                "provider": provider,
+                "trace_id": trace.trace_id,
+                "guardrail_action": guard_res.action
             }
             yield f"data: {json.dumps(meta_event)}\n\n"
 
             accumulated_answer = []
-            async for token in llm_client.generate_stream(full_prompt, system_prompt):
-                accumulated_answer.append(token)
-                yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
+            with trace.span("llm_stream_generation", {"model": active_model}):
+                async for token in llm_client.generate_stream(full_prompt, system_prompt):
+                    accumulated_answer.append(token)
+                    yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
 
             latency = round((time.perf_counter() - t0) * 1000, 1)
             full_ans = "".join(accumulated_answer)
-            await record_chat(req.question, full_ans, f"{provider}:{active_model}", contexts)
+            await record_chat(effective_query, full_ans, f"{provider}:{active_model}", contexts)
             
-            yield f"data: {json.dumps({'type': 'done', 'latency_ms': latency, 'model': active_model, 'provider': provider})}\n\n"
+            # Store in gateway cache
+            llm_gateway.store_response(effective_query, active_model, {
+                "answer": full_ans,
+                "contexts": contexts,
+                "confidence": retrieval_confidence
+            })
+
+            tracer.end_trace(trace, status="ok")
+            yield f"data: {json.dumps({'type': 'done', 'latency_ms': latency, 'model': active_model, 'provider': provider, 'trace_id': trace.trace_id})}\n\n"
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 
     # Non-streaming JSON response
-    tokens = []
-    async for token in llm_client.generate_stream(full_prompt, system_prompt):
-        tokens.append(token)
-    answer = "".join(tokens)
+    with trace.span("llm_sync_generation", {"model": active_model}):
+        tokens = []
+        async for token in llm_client.generate_stream(full_prompt, system_prompt):
+            tokens.append(token)
+        answer = "".join(tokens)
+
     latency = round((time.perf_counter() - t0) * 1000, 1)
-    
-    await record_chat(req.question, answer, f"{provider}:{active_model}", contexts)
-    
+    await record_chat(effective_query, answer, f"{provider}:{active_model}", contexts)
+    llm_gateway.store_response(effective_query, active_model, {
+        "answer": answer,
+        "contexts": contexts,
+        "confidence": retrieval_confidence
+    })
+    tracer.end_trace(trace, status="ok")
+
     doc_count = await get_doc_count()
     return RagResponse(
         answer=answer,
@@ -269,3 +326,47 @@ async def ask_rag(req: RagQueryRequest):
         docCount=doc_count,
         hyde_document=hyde_passage
     )
+
+# ── SECURITY, OBSERVABILITY & EVALS ENDPOINTS ───────────────────
+
+@router.post("/security/guardrail-check", response_model=GuardrailCheckResponse)
+async def check_guardrail(req: GuardrailCheckRequest):
+    res = guardrail_engine.evaluate(req.text)
+    return {
+        "is_safe": res.is_safe,
+        "action": res.action,
+        "threat_level": res.threat_level,
+        "flagged_categories": res.flagged_categories,
+        "sanitized_text": res.sanitized_text,
+        "refusal_message": res.refusal_message,
+        "rule_matches": res.rule_matches,
+        "latency_ms": res.latency_ms
+    }
+
+@router.get("/security/stats")
+async def get_security_stats():
+    return guardrail_engine.get_stats()
+
+@router.get("/observability/traces")
+async def get_traces(limit: int = 20):
+    return tracer.get_recent_traces(limit=limit)
+
+@router.get("/observability/stats")
+async def get_observability_stats():
+    return tracer.get_stats()
+
+@router.get("/gateway/stats")
+async def get_gateway_stats():
+    return llm_gateway.get_gateway_telemetry()
+
+@router.post("/evals/run")
+async def run_ragas_evals(k: int = 3, rerank_mode: str = "ensemble"):
+    summary = await ragas_evaluator.run_evaluation(rag_pipeline, k=k, rerank_mode=rerank_mode)
+    return summary
+
+@router.get("/evals/latest")
+async def get_latest_eval():
+    if not ragas_evaluator.latest_eval:
+        summary = await ragas_evaluator.run_evaluation(rag_pipeline, k=3, rerank_mode="ensemble")
+        return summary
+    return ragas_evaluator.latest_eval

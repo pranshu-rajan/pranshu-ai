@@ -118,3 +118,49 @@ class StatusResponse(BaseModel):
     demoCount: int
     demoDims: int
     docDims: int
+
+# Security, Observability & Evals Schemas
+class GuardrailCheckRequest(BaseModel):
+    text: str
+
+class GuardrailCheckResponse(BaseModel):
+    is_safe: bool
+    action: str
+    threat_level: str
+    flagged_categories: List[str]
+    sanitized_text: str
+    refusal_message: Optional[str] = None
+    rule_matches: List[str] = []
+    latency_ms: float
+
+class ObservabilitySpanSchema(BaseModel):
+    id: str
+    name: str
+    duration_ms: float
+    status: str
+    attributes: Dict[str, Any] = {}
+    error_message: Optional[str] = None
+
+class ObservabilityTraceSchema(BaseModel):
+    trace_id: str
+    name: str
+    query: str
+    total_duration_ms: float
+    status: str
+    spans: List[ObservabilitySpanSchema] = []
+    metadata: Dict[str, Any] = {}
+
+class RagasMetricsSchema(BaseModel):
+    faithfulness: float
+    answerRelevance: float
+    contextPrecision: float
+    contextRecall: float
+    compositeScore: float
+
+class RagasEvalResponse(BaseModel):
+    timestamp: str
+    datasetSize: int
+    rerankMode: str
+    metrics: RagasMetricsSchema
+    latencyMs: float
+    samples: List[Dict[str, Any]] = []

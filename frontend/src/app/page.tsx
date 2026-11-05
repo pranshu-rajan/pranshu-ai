@@ -8,6 +8,7 @@ import { HnswInspector } from "../components/HnswInspector";
 import { BenchmarkArena } from "../components/BenchmarkArena";
 import { RagStudio } from "../components/RagStudio";
 import { VectorCatalog } from "../components/VectorCatalog";
+import { ObservabilityStudio } from "../components/ObservabilityStudio";
 import { SystemStatus } from "../lib/types";
 import { fetchStatus } from "../lib/api";
 
@@ -89,6 +90,17 @@ export default function Home() {
             { label: "PERSISTENT DB", variant: "emerald" as const },
           ],
         };
+      case "observability":
+        return {
+          title: "Observability, Guardrails & Evals",
+          subtitle:
+            "Logfire-style distributed execution spans, real-time safety guardrails, and RAGAS metric evaluations.",
+          badges: [
+            { label: "LOGFIRE SPANS", variant: "indigo" as const, dot: true },
+            { label: "JAILBREAK & PII SHIELD", variant: "amber" as const },
+            { label: "RAGAS METRICS", variant: "emerald" as const },
+          ],
+        };
       default:
         return {
           title: "Vector Database",
@@ -126,6 +138,7 @@ export default function Home() {
             {activeTab === "benchmark" && <BenchmarkArena />}
             {activeTab === "rag" && <RagStudio />}
             {activeTab === "vectors" && <VectorCatalog />}
+            {activeTab === "observability" && <ObservabilityStudio />}
           </div>
         </main>
 

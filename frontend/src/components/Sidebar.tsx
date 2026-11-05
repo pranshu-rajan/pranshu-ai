@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Cpu,
+  ShieldCheck,
 } from "lucide-react";
 
 export interface NavTabItem {
@@ -65,6 +66,14 @@ export const NAV_TABS: NavTabItem[] = [
     icon: Database,
     description: "Index & Embeddings",
     code: "05",
+  },
+  {
+    id: "observability",
+    label: "Security & Evals",
+    shortLabel: "Guard & Evals",
+    icon: ShieldCheck,
+    description: "Guardrails & RAGAS",
+    code: "06",
   },
 ];
 
