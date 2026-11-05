@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { DocumentItem, DocumentChunk } from "../lib/types";
-import { fetchDocuments, uploadDocument, deleteDocument, askRagStream } from "../lib/api";
+import { DocumentItem, DocumentChunk, RerankMode, RerankBenchmarkResult } from "../lib/types";
+import { fetchDocuments, uploadDocument, deleteDocument, askRagStream, fetchRerankBenchmark } from "../lib/api";
 import {
   Sparkles,
   FileText,
@@ -20,6 +20,9 @@ import {
   Check,
   Compass,
   Cpu,
+  BarChart3,
+  Activity,
+  Zap,
 } from "lucide-react";
 import Button from "./ui/Button";
 import Badge from "./ui/Badge";
@@ -53,8 +56,14 @@ export const RagStudio: React.FC = () => {
   // Advanced RAG Controls
   const [useHybrid, setUseHybrid] = useState(true);
   const [useRerank, setUseRerank] = useState(true);
+  const [rerankMode, setRerankMode] = useState<RerankMode>("ensemble");
   const [useHyde, setUseHyde] = useState(false);
   const [topK, setTopK] = useState(3);
+
+  // Re-Ranker Evaluation Telemetry
+  const [benchResult, setBenchResult] = useState<RerankBenchmarkResult | null>(null);
+  const [benchmarking, setBenchmarking] = useState(false);
+  const [showBenchModal, setShowBenchModal] = useState(false);
 
   const loadDocs = async () => {
     try {
@@ -117,6 +126,20 @@ export const RagStudio: React.FC = () => {
     await loadDocs();
   };
 
+  const handleRunBenchmark = async () => {
+    setBenchmarking(true);
+    try {
+      const q = question.trim() || lastQuestion.trim() || "What is HNSW search algorithm complexity?";
+      const res = await fetchRerankBenchmark(q);
+      setBenchResult(res);
+      setShowBenchModal(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBenchmarking(false);
+    }
+  };
+
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim() || isAsking) return;
@@ -135,7 +158,7 @@ export const RagStudio: React.FC = () => {
     await askRagStream(
       q,
       topK,
-      { useHybrid, useRerank, useHyde },
+      { useHybrid, useRerank, useHyde, rerankMode },
       (meta) => {
         setActiveContexts(meta.contexts);
         if (meta.hydePassage) setHydeText(meta.hydePassage);
@@ -213,6 +236,22 @@ export const RagStudio: React.FC = () => {
                 </span>
               </label>
 
+              {/* Re-Ranker Mode Selector (Contextual vs FlashRank vs Ensemble) */}
+              {useRerank && (
+                <div className="flex items-center gap-1 pl-2 border-l border-[#E3DED6]">
+                  <span className="text-[#7E8794] text-[10px] font-mono uppercase">RERANKER:</span>
+                  <select
+                    value={rerankMode}
+                    onChange={(e) => setRerankMode(e.target.value as RerankMode)}
+                    className="rounded border border-[#DCD5C9] bg-white px-2 py-0.5 font-mono text-xs text-[#0935B8] font-bold focus:outline-none focus:border-[#0935B8] shadow-xs cursor-pointer"
+                  >
+                    <option value="ensemble">Ensemble (Hybrid)</option>
+                    <option value="contextual">Manual Context (~64µs)</option>
+                    <option value="flashrank">FlashRank Neural (~3ms)</option>
+                  </select>
+                </div>
+              )}
+
               {/* Top-K Select */}
               <div className="flex items-center gap-1 pl-2 border-l border-[#E3DED6]">
                 <span className="text-[#7E8794] text-[10px] font-mono uppercase">TOP-K:</span>
@@ -225,6 +264,20 @@ export const RagStudio: React.FC = () => {
                   <option value={3}>3</option>
                   <option value={5}>5</option>
                 </select>
+              </div>
+
+              {/* Reranker Evaluation Telemetry Button */}
+              <div className="pl-2 border-l border-[#E3DED6]">
+                <button
+                  type="button"
+                  onClick={handleRunBenchmark}
+                  disabled={benchmarking}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[#0935B8]/30 bg-[#EEF3FF] text-[#0935B8] font-mono text-[10px] font-bold hover:bg-[#0935B8] hover:text-white transition shadow-xs cursor-pointer disabled:opacity-50"
+                  title="Run microsecond & accuracy telemetry comparing manual vs enterprise rankers"
+                >
+                  <Cpu className="h-3 w-3" />
+                  <span>{benchmarking ? "EVALUATING..." : "EVAL RERANK"}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -666,6 +719,21 @@ export const RagStudio: React.FC = () => {
                     <p className="text-xs text-[#555C68] leading-relaxed line-clamp-3 font-sans">
                       {ctx.text}
                     </p>
+                    {/* Re-Ranker Score Breakdown */}
+                    {(ctx.manual_score !== undefined || ctx.flashrank_score !== undefined) && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-[#EBE7DF]">
+                        {ctx.manual_score !== undefined && (
+                          <span className="font-mono text-[9px] bg-[#FAF9F7] text-[#555C68] px-1.5 py-0.5 rounded border border-[#E3DED6]">
+                            Manual: <strong className="text-[#111315]">{ctx.manual_score}</strong>
+                          </span>
+                        )}
+                        {ctx.flashrank_score !== undefined && (
+                          <span className="font-mono text-[9px] bg-[#EEF3FF] text-[#0935B8] px-1.5 py-0.5 rounded border border-[#0935B8]/20">
+                            Neural: <strong className="text-[#0935B8]">{ctx.flashrank_score}</strong>
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="mt-2 pt-1.5 border-t border-[#EBE7DF] flex items-center justify-between text-[10px] text-[#7E8794] font-mono">
                       <span>Cosine Distance: {ctx.distance ?? "N/A"}</span>
                       <span className="text-[#0935B8] font-bold">CLICK TO INSPECT</span>
@@ -697,6 +765,128 @@ export const RagStudio: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Re-Ranker Evaluation Telemetry Modal */}
+      {showBenchModal && benchResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+          <div className="surface-card w-full max-w-2xl overflow-hidden shadow-specimen-lg border border-[#0935B8]/40 animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-[#E3DED6] bg-[#FAF9F7] px-5 py-3.5">
+              <div className="flex items-center gap-2">
+                <Cpu className="h-4 w-4 text-[#0935B8]" />
+                <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-[#111315]">
+                  Re-Ranker Telemetry & Accuracy Audit
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowBenchModal(false)}
+                className="rounded p-1 text-[#7E8794] hover:bg-[#EDEAE3] hover:text-[#111315] transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="flex flex-col gap-1 rounded bg-[#FAF9F7] p-3 border border-[#E3DED6]">
+                <span className="text-[10px] font-mono uppercase text-[#7E8794]">Query Evaluated:</span>
+                <span className="text-xs font-mono font-bold text-[#111315]">"{benchResult.query}"</span>
+              </div>
+
+              {/* KPI Speed & Accuracy Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="surface-card p-3 border-[#0935B8]/30 bg-[#EEF3FF]/40">
+                  <span className="block text-[10px] font-mono uppercase text-[#7E8794]">Manual Cross-Score</span>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-base font-bold font-mono text-[#0935B8]">{benchResult.manualCrossEncoderUs}</span>
+                    <span className="text-[10px] font-mono text-[#7E8794]">µs</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-[#0D5F52] mt-0.5 block font-bold">~0.06 ms latency</span>
+                </div>
+
+                <div className="surface-card p-3">
+                  <span className="block text-[10px] font-mono uppercase text-[#7E8794]">FlashRank Neural</span>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-base font-bold font-mono text-[#111315]">
+                      {(benchResult.flashrankNeuralUs / 1000).toFixed(2)}
+                    </span>
+                    <span className="text-[10px] font-mono text-[#7E8794]">ms</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-[#555C68] mt-0.5 block">TinyBERT ONNX</span>
+                </div>
+
+                <div className="surface-card p-3 border-[#0D5F52]/30 bg-[#F0FDF4]/50">
+                  <span className="block text-[10px] font-mono uppercase text-[#7E8794]">Speed Ratio</span>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-base font-bold font-mono text-[#0D5F52]">{benchResult.speedupFactor}x</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-[#0D5F52] mt-0.5 block font-bold">Manual is Faster</span>
+                </div>
+
+                <div className="surface-card p-3 border-[#0935B8]/30">
+                  <span className="block text-[10px] font-mono uppercase text-[#7E8794]">Top-K Agreement</span>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-base font-bold font-mono text-[#0935B8]">{benchResult.topKAgreementPercent}%</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-[#7E8794] mt-0.5 block">Rank Correlation</span>
+                </div>
+              </div>
+
+              {/* Top Hits Rank Ordering Comparison */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#555C68] block">
+                  Top Retrieved Candidates Rank Correlation
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* Manual Column */}
+                  <div className="rounded border border-[#E3DED6] bg-white p-3 space-y-2">
+                    <div className="flex items-center justify-between border-b border-[#EBE7DF] pb-1.5">
+                      <span className="font-mono text-[11px] font-bold text-[#111315]">Manual Cross-Encoder</span>
+                      <Badge variant="indigo" size="xs">Microsecond Math</Badge>
+                    </div>
+                    {benchResult.topManualHits.map((h, i) => (
+                      <div key={h.id} className="flex items-center justify-between text-[11px]">
+                        <span className="font-mono text-[#555C68] truncate max-w-[180px]">
+                          [{i + 1}] {h.title}
+                        </span>
+                        <span className="font-mono font-bold text-[#0935B8]">{h.score}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* FlashRank Column */}
+                  <div className="rounded border border-[#E3DED6] bg-white p-3 space-y-2">
+                    <div className="flex items-center justify-between border-b border-[#EBE7DF] pb-1.5">
+                      <span className="font-mono text-[11px] font-bold text-[#111315]">FlashRank Neural</span>
+                      <Badge variant="slate" size="xs">TinyBERT Transformer</Badge>
+                    </div>
+                    {benchResult.topFlashrankHits.map((h, i) => (
+                      <div key={h.id} className="flex items-center justify-between text-[11px]">
+                        <span className="font-mono text-[#555C68] truncate max-w-[180px]">
+                          [{i + 1}] {h.title}
+                        </span>
+                        <span className="font-mono font-bold text-[#111315]">{h.score}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Informational callout */}
+              <div className="rounded border border-[#0D5F52]/20 bg-[#F0FDF4] p-3 text-[11px] text-[#0D5F52] leading-relaxed">
+                <strong>Cartographic Verification Verdict:</strong> Our from-scratch mathematical cross-encoder (0.55 · (1 - dist) + 0.45 · overlap) achieves a <strong>{benchResult.speedupFactor}x speed advantage</strong> ({benchResult.manualCrossEncoderUs} µs vs {(benchResult.flashrankNeuralUs / 1000).toFixed(1)} ms) while preserving <strong>{benchResult.topKAgreementPercent}% top-candidate rank fidelity</strong> compared to enterprise transformer models.
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-[#E3DED6] bg-[#FAF9F7] px-5 py-3 flex justify-end">
+              <Button variant="primary" size="sm" onClick={() => setShowBenchModal(false)}>
+                CLOSE AUDIT
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

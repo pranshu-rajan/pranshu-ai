@@ -111,21 +111,54 @@ async def upload_document(
         content_bytes = await file.read()
         filename = file.filename or "Uploaded Document"
         doc_title = title or filename
+        lower_name = filename.lower()
         
-        # Check if PDF
-        if filename.lower().endswith(".pdf"):
+        # Enterprise Multi-Format Ingestion (PDF, DOCX, PPTX, JSON, CSV, TXT, MD)
+        if lower_name.endswith(".pdf"):
             import re
             pdf_str = content_bytes.decode("latin1", errors="ignore")
-            # Extract parenthesized strings inside Tj or TJ blocks
             matches = re.findall(r'\((.*?)\)\s*Tj', pdf_str)
             if not matches:
                 matches = re.findall(r'\[(.*?)\]\s*TJ', pdf_str)
             if matches:
                 extracted_text = " ".join([m.replace(r'\(', '(').replace(r'\)', ')') for m in matches])
             else:
-                # Extract ASCII words
                 extracted_text = " ".join(re.findall(r'[A-Za-z0-9\s,\.\?\!\-\:;]{4,}', pdf_str))
             if len(extracted_text.strip()) < 30:
+                extracted_text = content_bytes.decode("utf-8", errors="ignore")
+        elif lower_name.endswith(".docx"):
+            import zipfile
+            import io
+            import xml.etree.ElementTree as ET
+            try:
+                with zipfile.ZipFile(io.BytesIO(content_bytes)) as docx_zip:
+                    xml_content = docx_zip.read('word/document.xml')
+                    tree = ET.fromstring(xml_content)
+                    texts = [elem.text for elem in tree.iter() if elem.tag.endswith('}t') and elem.text]
+                    extracted_text = " ".join(texts)
+            except Exception as e:
+                extracted_text = content_bytes.decode("utf-8", errors="ignore")
+        elif lower_name.endswith(".pptx"):
+            import zipfile
+            import io
+            import xml.etree.ElementTree as ET
+            try:
+                texts = []
+                with zipfile.ZipFile(io.BytesIO(content_bytes)) as pptx_zip:
+                    slide_files = [f for f in pptx_zip.namelist() if f.startswith('ppt/slides/slide') and f.endswith('.xml')]
+                    slide_files.sort()
+                    for s in slide_files:
+                        xml_content = pptx_zip.read(s)
+                        tree = ET.fromstring(xml_content)
+                        texts.extend([elem.text for elem in tree.iter() if elem.tag.endswith('}t') and elem.text])
+                extracted_text = " ".join(texts)
+            except Exception as e:
+                extracted_text = content_bytes.decode("utf-8", errors="ignore")
+        elif lower_name.endswith(".json"):
+            try:
+                data = json.loads(content_bytes.decode("utf-8", errors="ignore"))
+                extracted_text = json.dumps(data, indent=2)
+            except Exception:
                 extracted_text = content_bytes.decode("utf-8", errors="ignore")
         else:
             extracted_text = content_bytes.decode("utf-8", errors="ignore")
@@ -149,17 +182,23 @@ async def delete_doc(doc_id: int):
     await rag_pipeline.reload_index()
     return {"ok": True}
 
+@router.get("/rag/benchmark-rerank")
+async def benchmark_rerank(query: str = "HNSW search algorithm complexity"):
+    res = await rag_pipeline.benchmark_manual_vs_enterprise(query=query)
+    return res
+
 @router.post("/rag/ask")
 async def ask_rag(req: RagQueryRequest):
     t0 = time.perf_counter()
     
-    # 1. Advanced Context Retrieval
+    # 1. Advanced Context Retrieval with Selected Re-Ranker Mode
     contexts, hyde_passage = await rag_pipeline.retrieve(
         question=req.question,
         k=req.k,
         use_hybrid=req.use_hybrid,
         use_rerank=req.use_rerank,
-        use_hyde=req.use_hyde
+        use_hyde=req.use_hyde,
+        rerank_mode=req.rerank_mode or "ensemble"
     )
 
     # 2. Build Prompt

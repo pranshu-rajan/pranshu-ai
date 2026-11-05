@@ -50,7 +50,24 @@ export interface DocumentChunk {
   distance?: number;
   rrf_score?: number;
   rerank_score?: number;
+  manual_score?: number;
+  flashrank_score?: number;
   confidence?: "high" | "medium" | "low" | string;
+}
+
+export type RerankMode = "contextual" | "flashrank" | "ensemble";
+
+export interface RerankBenchmarkResult {
+  query: string;
+  chunkCount: number;
+  manualCrossEncoderUs: number;
+  flashrankNeuralUs: number;
+  speedupFactor: number;
+  topKAgreementPercent: number;
+  bm25LatencyUs: number;
+  topManualHits: Array<{ id: number; title: string; score: number }>;
+  topFlashrankHits: Array<{ id: number; title: string; score: number }>;
+  isFlashrankAvailable: boolean;
 }
 
 export interface DocumentItem {

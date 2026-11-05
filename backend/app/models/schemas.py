@@ -77,6 +77,9 @@ class DocumentChunk(BaseModel):
     text: str
     distance: Optional[float] = None
     rerank_score: Optional[float] = None
+    manual_score: Optional[float] = None
+    flashrank_score: Optional[float] = None
+    confidence: Optional[str] = None
 
 class DocumentItem(BaseModel):
     id: int
@@ -91,6 +94,7 @@ class RagQueryRequest(BaseModel):
     use_hybrid: bool = True
     use_rerank: bool = True
     use_hyde: bool = False
+    rerank_mode: Optional[str] = Field(default="ensemble", pattern="^(contextual|flashrank|ensemble)$")
     stream: bool = True
 
 class RagResponse(BaseModel):

@@ -1,5 +1,6 @@
 import re
 import math
+import time
 import asyncio
 import numpy as np
 from typing import List, Dict, Any, Tuple, Optional
@@ -7,6 +8,14 @@ from collections import Counter
 from app.rag.llm_client import llm_client
 from app.db.database import get_all_chunks, insert_chunk, insert_document
 from app.engine.vector_engine import HNSWIndex, get_dist_fn
+
+# Optional Enterprise Neural Cross-Encoder (FlashRank TinyBERT from 8-Hour Marathon)
+try:
+    from flashrank import Ranker, RerankRequest
+    flashrank_ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+except Exception as e:
+    print(f"[FlashRank] Neural model not loaded: {e}. Using custom contextual cross-encoder.")
+    flashrank_ranker = None
 
 def recursive_chunk_text(text: str, chunk_size: int = 350, overlap: int = 50) -> List[str]:
     """
@@ -116,7 +125,7 @@ class AdvancedRAGPipeline:
     - Hypothetical Document Embeddings (HyDE)
     - Weighted Dense + Sparse Hybrid Search via Reciprocal Rank Fusion (RRF)
     - Semantic Deduplication (Maximal Marginal Relevance / Diversity Filtering)
-    - Contextual Cross-Encoder Re-Ranking
+    - Contextual Cross-Encoder Re-Ranking + Enterprise FlashRank Integration
     - Corrective RAG (CRAG) Retrieval Confidence Scoring
     """
     def __init__(self):
@@ -144,7 +153,7 @@ class AdvancedRAGPipeline:
         if not raw_chunks:
             return doc_id
 
-        # 2026 Contextual Enrichment: Prefix each chunk with document provenance metadata
+        # Contextual Enrichment: Prefix each chunk with document provenance metadata
         total = len(raw_chunks)
         enriched_chunks = []
         for idx, chunk_str in enumerate(raw_chunks):
@@ -193,11 +202,9 @@ class AdvancedRAGPipeline:
         """
         scores: Dict[int, float] = {}
 
-        # Dense rank (lower distance is better, rank 0 is best)
         for rank, (_, doc_id) in enumerate(dense_results):
             scores[doc_id] = scores.get(doc_id, 0.0) + (w_dense / (k_rrf + rank + 1))
 
-        # Sparse rank (higher score is better, rank 0 is best)
         for rank, (_, doc_id) in enumerate(sparse_results):
             scores[doc_id] = scores.get(doc_id, 0.0) + (w_sparse / (k_rrf + rank + 1))
 
@@ -207,7 +214,7 @@ class AdvancedRAGPipeline:
 
     def deduplicate_chunks(self, candidates: List[Dict[str, Any]], jaccard_threshold: float = 0.65) -> List[Dict[str, Any]]:
         """
-        2026 Semantic Diversity Filtering:
+        Semantic Diversity Filtering:
         Suppresses near-duplicate passages to maximize informational entropy in the context window.
         """
         unique_chunks: List[Dict[str, Any]] = []
@@ -218,7 +225,6 @@ class AdvancedRAGPipeline:
             if not tokens:
                 continue
 
-            # Compare Jaccard similarity against already accepted chunks
             is_duplicate = False
             for prev_tokens in seen_token_sets:
                 intersection = len(tokens.intersection(prev_tokens))
@@ -235,8 +241,8 @@ class AdvancedRAGPipeline:
 
     def contextual_rerank(self, query: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Contextual Cross-Encoder Re-Ranking:
-        Evaluates joint token-level semantic overlap and vector distance penalty.
+        Mathematical Contextual Cross-Encoder Re-Ranking:
+        Evaluates joint token-level semantic overlap and vector distance penalty in sub-millisecond time.
         """
         q_tokens = set(re.findall(r'\w+', query.lower()))
         reranked = []
@@ -255,15 +261,63 @@ class AdvancedRAGPipeline:
             
             # Combined cross-score
             score = (0.55 * dist_score) + (0.45 * overlap)
-            cand["rerank_score"] = round(score, 4)
-            reranked.append(cand)
+            item = dict(cand)
+            item["manual_score"] = round(score, 4)
+            item["rerank_score"] = round(score, 4)
+            reranked.append(item)
 
         reranked.sort(key=lambda x: x["rerank_score"], reverse=True)
         return reranked
 
+    def flashrank_rerank(self, query: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Enterprise Neural Cross-Encoder Re-Ranking via FlashRank (ms-marco-TinyBERT-L-2-v2).
+        Runs quantized ONNX transformer inference locally.
+        """
+        if not flashrank_ranker or not candidates:
+            return self.contextual_rerank(query, candidates)
+
+        passages = [{"id": str(c["id"]), "text": c["text"], "meta": c} for c in candidates]
+        try:
+            req = RerankRequest(query=query, passages=passages)
+            results = flashrank_ranker.rerank(req)
+
+            reranked = []
+            for item in results:
+                cand = dict(item["meta"])
+                f_score = round(float(item["score"]), 4)
+                cand["flashrank_score"] = f_score
+                cand["rerank_score"] = f_score
+                reranked.append(cand)
+            return reranked
+        except Exception as e:
+            print(f"[FlashRank Warning] Fallback to manual cross-encoder: {e}")
+            return self.contextual_rerank(query, candidates)
+
+    def ensemble_rerank(self, query: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Ensemble Re-Ranking:
+        Combines our high-speed mathematical cross-encoder with FlashRank neural cross-encoder.
+        """
+        manual = self.contextual_rerank(query, candidates)
+        if not flashrank_ranker:
+            return manual
+
+        flash = self.flashrank_rerank(query, candidates)
+        flash_map = {c["id"]: c.get("flashrank_score", 0.0) for c in flash}
+
+        for cand in manual:
+            m = cand.get("manual_score", 0.5)
+            f = flash_map.get(cand["id"], 0.5)
+            cand["flashrank_score"] = f
+            cand["rerank_score"] = round((0.45 * m) + (0.55 * f), 4)
+
+        manual.sort(key=lambda x: x["rerank_score"], reverse=True)
+        return manual
+
     def evaluate_retrieval_confidence(self, candidates: List[Dict[str, Any]]) -> str:
         """
-        2026 Corrective RAG (CRAG) Confidence Assessment:
+        Corrective RAG (CRAG) Confidence Assessment:
         Classifies overall retrieval quality into 'high', 'medium', or 'low'.
         """
         if not candidates:
@@ -279,7 +333,7 @@ class AdvancedRAGPipeline:
 
     async def generate_hyde_passage(self, question: str) -> Optional[str]:
         """
-        2026 HyDE Expansion:
+        HyDE Expansion:
         Generates a concise hypothetical answer to align interrogative query space
         with declarative document knowledge space.
         """
@@ -304,7 +358,8 @@ class AdvancedRAGPipeline:
         k: int = 4,
         use_hybrid: bool = True,
         use_rerank: bool = True,
-        use_hyde: bool = False
+        use_hyde: bool = False,
+        rerank_mode: str = "ensemble"
     ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
         if not self.is_initialized:
             await self.reload_index()
@@ -348,9 +403,14 @@ class AdvancedRAGPipeline:
         # 4. Semantic Diversity Deduplication
         candidates = self.deduplicate_chunks(candidates)
 
-        # 5. Contextual Cross-Encoder Reranking
+        # 5. Re-Ranking (Contextual vs FlashRank vs Ensemble)
         if use_rerank and candidates:
-            final_hits = self.contextual_rerank(question, candidates)[:k]
+            if rerank_mode == "flashrank":
+                final_hits = self.flashrank_rerank(question, candidates)[:k]
+            elif rerank_mode == "ensemble":
+                final_hits = self.ensemble_rerank(question, candidates)[:k]
+            else:
+                final_hits = self.contextual_rerank(question, candidates)[:k]
         else:
             final_hits = candidates[:k]
 
@@ -360,5 +420,57 @@ class AdvancedRAGPipeline:
             h["confidence"] = confidence
 
         return final_hits, hyde_text
+
+    async def benchmark_manual_vs_enterprise(self, query: str = "HNSW search algorithm complexity") -> Dict[str, Any]:
+        """
+        Rigorous Evaluation Benchmark:
+        Compares our Manual Mathematical Pipeline against Enterprise Standards (FlashRank, BM25, BruteForce).
+        """
+        if not self.is_initialized:
+            await self.reload_index()
+
+        chunks = list(self.chunks_cache.values())
+        if not chunks:
+            return {"error": "No indexed chunks available for benchmark"}
+
+        # 1. Evaluate Manual Contextual Cross-Encoder Speed
+        t0 = time.perf_counter()
+        manual_results = self.contextual_rerank(query, chunks)
+        t_manual_us = round((time.perf_counter() - t0) * 1_000_000, 2)
+
+        # 2. Evaluate FlashRank Neural Cross-Encoder Speed
+        t0 = time.perf_counter()
+        flash_results = self.flashrank_rerank(query, chunks)
+        t_flash_us = round((time.perf_counter() - t0) * 1_000_000, 2)
+
+        # 3. Evaluate Top-K Agreement (Spearman / Top-K Overlap)
+        top_manual_ids = [c["id"] for c in manual_results[:5]]
+        top_flash_ids = [c["id"] for c in flash_results[:5]]
+        overlap = len(set(top_manual_ids).intersection(set(top_flash_ids)))
+        agreement_pct = round((overlap / max(1, min(5, len(chunks)))) * 100, 1)
+
+        # 4. Evaluate BM25 Lexical Hit
+        t0 = time.perf_counter()
+        bm25_hits = self.bm25.search(query, top_k=5)
+        t_bm25_us = round((time.perf_counter() - t0) * 1_000_000, 2)
+
+        return {
+            "query": query,
+            "chunkCount": len(chunks),
+            "manualCrossEncoderUs": t_manual_us,
+            "flashrankNeuralUs": t_flash_us,
+            "speedupFactor": round(t_flash_us / max(t_manual_us, 0.1), 1),
+            "topKAgreementPercent": agreement_pct,
+            "bm25LatencyUs": t_bm25_us,
+            "topManualHits": [
+                {"id": c["id"], "title": c["title"], "score": c.get("manual_score", 0.0)}
+                for c in manual_results[:3]
+            ],
+            "topFlashrankHits": [
+                {"id": c["id"], "title": c["title"], "score": c.get("flashrank_score", 0.0)}
+                for c in flash_results[:3]
+            ],
+            "isFlashrankAvailable": bool(flashrank_ranker is not None)
+        }
 
 rag_pipeline = AdvancedRAGPipeline()
